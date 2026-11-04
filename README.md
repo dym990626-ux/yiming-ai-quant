@@ -36,7 +36,7 @@ CVD与VWAP仅计算当前交易所返回的成交样本窗口（Binance最近最
 
 ## 验证状态
 
-详见 `VALIDATION.md`。离线SQLite测试运行真实迁移与触发器，但不等同于Cloudflare D1线上兼容验证。合并前仍须完成依赖安装、TypeScript/Vite构建、本地Worker集成与手机/桌面浏览器验收。
+详见 `VALIDATION.md`。离线SQLite测试运行真实迁移与触发器，但不等同于Cloudflare D1线上兼容验证。续验已完成依赖安装、TypeScript强制编译与Vite完整构建。合并前仍须完成本地Worker集成与手机/桌面浏览器验收。
 
 ---
 
