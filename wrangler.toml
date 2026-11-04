@@ -1,5 +1,12 @@
 name = "divine-wood-aa20"
 compatibility_date = "2026-11-04"
+main = "src/worker.ts"
 
 [assets]
 directory = "./dist"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "yiming-quant"
+database_id = "a51b6caa-9a13-4c7a-9fac-f2b05809efa9"
