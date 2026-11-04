@@ -4,7 +4,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "predev": "tar -xzf source.tar.gz",
     "dev": "vite",
+    "prebuild": "tar -xzf source.tar.gz",
     "build": "tsc -b && vite build",
     "preview": "vite preview"
   },
