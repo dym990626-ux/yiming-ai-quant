@@ -39,7 +39,7 @@ export function SimTradePage({symbol:initialSymbol}:{symbol:SymbolId;ticker:Tick
    setIntent(input)
    const r=await fetch('/api/sim/orders',{method:'POST',headers:{Authorization:`Bearer ${secret}`,'content-type':'application/json'},body:JSON.stringify(input),signal:AbortSignal.timeout(15000)})
    const result=await r.json()
-   if(!r.ok){if([400,409,413,415,422].includes(r.status))setIntent(null);throw new Error(result.error||'订单未确认')}
+   if(!r.ok){if([400,403,409,413,415,422].includes(r.status))setIntent(null);throw new Error(result.error||'订单未确认')}
    setIntent(null);await refreshAccount()
   }catch(e){setError(e instanceof Error?e.message:'订单未确认，请以同一幂等键重试')}
   finally{inFlight.current=false;setBusy(false)}
