@@ -1,6 +1,6 @@
 /** All amounts in ledger are integer micro-USDT. No exchange order API exists. */
 export const UNIT = 1_000_000
-export const LIMITS = Object.freeze({ initial: 1000 * UNIT, position: 250 * UNIT, risk: 5 * UNIT, dailyLoss: 20 * UNIT, streak: 3, slippage: .005, quoteAge: 10_000, fee: .001, fillSlip: .0005 })
+export const LIMITS = Object.freeze({ initial: 1000 * UNIT, position: 250 * UNIT, risk: 5 * UNIT, dailyLoss: 20 * UNIT, streak: 3, slippage: .005, quoteAge: 10_000, fee: .0005, fillSlip: .0003 })
 export type SimSymbol = 'BTCUSDT' | 'ETHUSDT' | 'SOLUSDT'
 export type Side = 'long' | 'short'
 export type Quote = { symbol: SimSymbol; price: number; timestamp: number; source: string }
@@ -15,7 +15,7 @@ export function parseOrder(raw: unknown): OrderInput {
   if (!raw || typeof raw !== 'object') throw new SimError('无效订单')
   const x = raw as OrderInput
   if (typeof x.id !== 'string' || !/^[a-zA-Z0-9_-]{8,100}$/.test(x.id) || !['open', 'close'].includes(x.action) || !['BTCUSDT', 'ETHUSDT', 'SOLUSDT'].includes(x.symbol) || !positive(x.expectedPrice)) throw new SimError('订单标识、品种、动作或参考价无效')
-  if (x.action === 'open' && (!['long', 'short'].includes(x.side ?? '') || !positive(x.notional) || !positive(x.stop))) throw new SimError('开仓必须提供方向、正数仓位及止损')
+  if (x.action === 'open' && (x.side !== 'long' || !positive(x.notional) || !positive(x.stop))) throw new SimError('第一阶段仅允许现货模拟做多；开仓须提供正数仓位及止损', 403)
   if (x.take !== undefined && !positive(x.take)) throw new SimError('止盈必须为正数')
   return { id: x.id, action: x.action, symbol: x.symbol, expectedPrice: x.expectedPrice, ...(x.action === 'open' ? { side: x.side, notional: x.notional, stop: x.stop, ...(x.take === undefined ? {} : { take: x.take }) } : {}) }
 }
@@ -32,7 +32,7 @@ export function prepareOrder(account: Account, raw: OrderInput, quote: Quote, no
   let cashDelta: number, positionDelta: number, fee: number, pnl = 0, next: Position | null = null
   if (x.action === 'open') {
     if (position) throw new SimError('已有持仓', 409)
-    if ((account.day === day && account.daily_pnl <= -LIMITS.dailyLoss) || account.streak >= LIMITS.streak) throw new SimError('熔断：每日亏损20U或连续亏损3笔', 409)
+    if ((account.day === day && account.daily_pnl <= -LIMITS.dailyLoss) || account.streak >= LIMITS.streak) throw new SimError('熔断：每日亏损20U或连续亏损3笔', 403)
     const notional = Math.round(x.notional! * UNIT), quantity = notional / UNIT / fill, stop = x.stop!
     if (!Number.isSafeInteger(notional) || notional <= 0 || notional > LIMITS.position) throw new SimError('单笔仓位不得超过250U')
     if (x.side === 'long' ? stop >= fill : stop <= fill) throw new SimError('止损方向错误')
