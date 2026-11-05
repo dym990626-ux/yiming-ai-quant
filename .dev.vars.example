@@ -1,0 +1,2 @@
+# Copy to ignored .dev.vars and choose a unique local-only key. No exchange keys.
+SIM_API_KEY="replace-with-a-unique-local-only-secret"

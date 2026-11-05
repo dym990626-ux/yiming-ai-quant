@@ -1,0 +1,15 @@
+# Local/preview simulation only. No production database binding, route or schedule.
+name = "yiming-ai-quant-sim-v2-review"
+compatibility_date = "2026-11-04"
+main = "src/worker.ts"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "SIM_DB"
+database_name = "yiming-sim-v2-local"
+# Local-only placeholder. Provision a NEW preview database before remote preview use.
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
