@@ -5,3 +5,5 @@ import './styles.css'
 import './enhancements.css'
 import './terminal-v2.css'
 createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>)
+
+import './whale-analytics.css'
