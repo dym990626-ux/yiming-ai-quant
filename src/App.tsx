@@ -27,11 +27,11 @@ export default function App() {
     let tickerWs:WebSocket|null=null,klineWs:WebSocket|null=null,active=true,last=Date.now(),heartbeat:ReturnType<typeof window.setInterval>|null=null
     const touch=()=>{last=Date.now();attempts.current=0;setStatus('connected')}
     const onCandle=(update:{candle:Candle})=>{touch();setCandles(prev=>{const list=[...prev],i=list.findIndex(x=>x.time===update.candle.time);if(i>=0)list[i]=update.candle;else list.push(update.candle);return list.sort((a,b)=>a.time-b.time).slice(-1000)})}
-    const retry=()=>{if(!active)return;setStatus('stale');const wait=Math.min(30_000,1000*2**attempts.current++);reconnect.current=window.setTimeout(connect,wait)}
+    const retry=()=>{if(!active||reconnect.current)return;setStatus('stale');const wait=Math.min(30_000,1000*2**attempts.current++);reconnect.current=window.setTimeout(()=>{reconnect.current=null;connect()},wait)}
     const connect=()=>{if(!active)return
       tickerWs=activeSource==='okx'?openOkxTickerSocket(symbol,t=>{touch();setTicker(t)},touch,retry,()=>setStatus('stale')):openTickerSocket(symbol,t=>{touch();setTicker(t)},touch,retry,()=>setStatus('stale'))
       klineWs=activeSource==='okx'?openOkxKlineSocket(symbol,interval,onCandle,touch,retry,()=>setStatus('stale')):openBinanceKlineSocket(symbol,interval,onCandle,touch,retry,()=>setStatus('stale'))
-      heartbeat=window.setInterval(()=>{if(Date.now()-last>15_000){tickerWs?.close();klineWs?.close();retry()}},3000)
+      heartbeat=window.setInterval(()=>{if(Date.now()-last>50_000){tickerWs?.close();klineWs?.close();retry()}},3000)
     }
     connect();return()=>{active=false;if(reconnect.current)clearTimeout(reconnect.current);if(heartbeat)clearInterval(heartbeat);tickerWs?.close();klineWs?.close()}
   }, [symbol,interval,activeSource])
