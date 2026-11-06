@@ -166,7 +166,19 @@ export default {
     // The Bark device key is a Worker secret and is never included in responses or HTML.
     if (url.pathname === '/api/bark/status') {
       if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405)
-      return json({ configured: Boolean(env.BARK_DEVICE_KEY), notificationEnabled: env.BARK_AUTO_ENABLED === '1' && Boolean(env.BARK_DEVICE_KEY), mode: env.BARK_AUTO_ENABLED === '1' && env.BARK_DEVICE_KEY ? 'scheduled-with-d1-migration-required' : 'manual-authenticated-test-only' })
+      let ledgerReady = false
+      try {
+        const table = await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='whale_alert_events'").first<{name:string}>()
+        ledgerReady = Boolean(table)
+      } catch { /* not migrated or DB unavailable: alerts remain disabled */ }
+      const configured = Boolean(env.BARK_DEVICE_KEY)
+      return json({
+        configured, ledgerReady, optIn: env.BARK_AUTO_ENABLED === '1',
+        notificationEnabled: configured && ledgerReady && env.BARK_AUTO_ENABLED === '1',
+        mode: 'scheduled-whale-alerts',
+        thresholdUsdt: Number(env.BARK_WHALE_THRESHOLD_USDT) >= 10000 ? Number(env.BARK_WHALE_THRESHOLD_USDT) : 100000,
+        checkedAt: new Date().toISOString(),
+      })
     }
 
     // Authenticated infrastructure smoke test. Not callable from the public UI.
