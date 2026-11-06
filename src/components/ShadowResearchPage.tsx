@@ -21,7 +21,7 @@ export function ShadowResearchPage(){
  const [loading,setLoading]=useState(false)
  const [feePct,setFeePct]=useState(.1)
  const [slipPct,setSlipPct]=useState(.05)
- const [position,setPosition]=useState(0)
+ const [position,setPosition]=useState(30)
  const [sample,setSample]=useState<'train'|'test'>('test')
  const [simStatus,setSimStatus]=useState('正在读取真实后端风控状态…')
  useEffect(()=>{
@@ -42,7 +42,7 @@ export function ShadowResearchPage(){
    const unique=clean.filter((c,i)=>i===0||c.time!==clean[i-1].time)
    if(unique.length<100)throw Error('已完成历史 K 线不足100根，无法执行可信样本外比较')
    setCandles(unique);setSource(`已验证公开历史 K 线 ${unique.length} 根 · ${clock(unique[0].time)} 至 ${clock(unique[unique.length-1].time)}`)
-   setPosition(0)
+   setPosition(30)
   }catch(e){setError(e instanceof Error?e.message:'公开数据无法读取')}
   finally{setLoading(false)}
  }
@@ -63,7 +63,7 @@ export function ShadowResearchPage(){
  },[candles,split,sample,interval,feePct,slipPct])
  const totalAbsolute=research.reduce((sum,r)=>sum+Math.abs(r.result ? r.result.finalEquity-10000 : 0),0)
  const replayCandles=activeCandles
- const replayIndex=Math.min(replayCandles.length-1,Math.max(0,position||Math.min(30,replayCandles.length-1)))
+ const replayIndex=Math.min(replayCandles.length-1,Math.max(0,position))
  const replayHistory=useMemo(()=>replayCandles.slice(0,replayIndex+1),[replayCandles,replayIndex])
  const replayLast=replayHistory.at(-1)
  const movingFast=useMemo(()=>sma(replayHistory,7).at(-1)?.value,[replayHistory])
