@@ -29,8 +29,8 @@ export function WhaleRadarPage() {
   useEffect(() => {
     const controller = new AbortController()
     fetch('/api/bark/status', { cache:'no-store', signal:controller.signal })
-      .then(async r => { if (!r.ok) throw Error('status unavailable'); return r.json() as Promise<{configured:boolean;notificationEnabled:boolean}> })
-      .then(x => setBark(x.configured ? 'Bark 服务端已配置；自动推送规则尚未启用。' : 'Bark 未配置：需在 Cloudflare Worker Secrets 设置 BARK_DEVICE_KEY，网页不保存密钥。'))
+      .then(async r => { if (!r.ok) throw Error('status unavailable'); return r.json() as Promise<{configured:boolean;notificationEnabled:boolean;ledgerReady:boolean;optIn:boolean;thresholdUsdt:number}> })
+      .then(x => setBark(x.notificationEnabled ? `Bark 自动大单监控已配置：每5分钟扫描，单笔门槛 ${x.thresholdUsdt.toLocaleString('en-US')} USDT，15分钟冷却。手机实际送达仍需测试。` : !x.configured ? 'Bark 未配置：需要在 Cloudflare Worker Secrets 添加 BARK_DEVICE_KEY，网页不会保存密钥。' : !x.ledgerReady ? 'Bark 设备密钥已配置，但 D1 告警队列表尚未迁移；自动发送保持关闭。' : 'Bark 已配置但自动告警未开启，需要服务端明确设置 BARK_AUTO_ENABLED=1。'))
       .catch(() => { if (!controller.signal.aborted) setBark('Bark 状态暂不可用。') })
     return () => controller.abort()
   }, [])
