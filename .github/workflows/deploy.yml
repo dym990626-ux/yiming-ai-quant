@@ -47,3 +47,28 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Production HTTP smoke test
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, time, urllib.request
+          base = "https://divine-wood-aa20.floral-sun-f603.workers.dev"
+          for path, field in [("/api/bark/status","notificationEnabled"), ("/api/sim/status","serverExecutionEnabled")]:
+              last = None
+              for attempt in range(5):
+                  try:
+                      with urllib.request.urlopen(base + path, timeout=12) as response:
+                          if response.status != 200:
+                              raise ValueError("HTTP status " + str(response.status))
+                          data = json.load(response)
+                          if field not in data:
+                              raise ValueError("Missing expected readiness field: " + field)
+                          print("PASS", path, "readiness checked")
+                          break
+                  except Exception as error:
+                      last = error
+                      time.sleep(3)
+              else:
+                  raise SystemExit("Production smoke test failed for " + path + ": " + str(last))
+          PY
