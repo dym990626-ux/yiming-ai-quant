@@ -183,7 +183,8 @@ export default {
 
     if (url.pathname === '/api/alert') {
       if (request.method !== 'POST') return json({ error: '请使用 POST 请求' }, 405)
-      if (env.ALERT_API_KEY && request.headers.get('X-Alert-Key') !== env.ALERT_API_KEY) return json({ ok: false, sent: false, error: '预警接口鉴权失败' }, 401)
+      if (!env.ALERT_API_KEY) return json({ ok: false, sent: false, error: '预警接口未启用：未配置服务端鉴权密钥' }, 503)
+      if (request.headers.get('X-Alert-Key') !== env.ALERT_API_KEY) return json({ ok: false, sent: false, error: '预警接口鉴权失败' }, 401)
       if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) return json({ ok: false, sent: false, error: '未配置 Telegram Worker Secret' }, 503)
       try {
         const market = await marketFor(symbolFrom(url.searchParams.get('symbol')))
