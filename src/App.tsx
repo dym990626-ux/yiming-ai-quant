@@ -6,8 +6,9 @@ import { ResearchPage } from './components/ResearchPage'
 import { SettingsPage, readSettings, settingsKey, type AppSettings } from './components/SettingsPage'
 import { AlertPanel } from './components/AlertPanel'
 import { LeverageRiskPage } from './components/LeverageRiskPage'
-import { fetchKlines, fetchTicker, intervals, openBinanceKlineSocket, openOkxKlineSocket, openOkxTickerSocket, openTickerSocket, sourceOf, symbols, type ActiveSource } from './lib/market'
+import { fetchKlines, fetchTicker, intervals, openBinanceKlineSocket, openOkxKlineSocket, openOkxTickerSocket, openTickerSocket, openPublicTradeSocket, sourceOf, symbols, type ActiveSource } from './lib/market'
 import { macd, rsi } from './lib/indicators'
+import { RollingOrderflow, type OrderflowSnapshot } from './lib/orderflow'
 import type { Candle, ConnectionState, IntervalId, SymbolId, Ticker } from './types'
 
 const formatPrice = (n: number) => new Intl.NumberFormat('en-US', { maximumFractionDigits: n >= 100 ? 2 : n >= 1 ? 4 : 6 }).format(n)
@@ -19,6 +20,7 @@ export default function App() {
   const [settings, setSettings] = useState<AppSettings>(initialSettings)
   const [page, setPage] = useState('行情中心'), [symbol, setSymbol] = useState<SymbolId>(initialSettings.defaultSymbol), [interval, setInterval] = useState<IntervalId>(initialSettings.defaultInterval)
   const [candles, setCandles] = useState<Candle[]>([]), [ticker, setTicker] = useState<Ticker | null>(null), [status, setStatus] = useState<ConnectionState>('loading'), [error, setError] = useState<string | null>(null),[activeSource,setActiveSource]=useState<ActiveSource|null>(null)
+  const [orderflow, setOrderflow] = useState<OrderflowSnapshot | null>(null)
   const reconnect = useRef<ReturnType<typeof setTimeout> | null>(null), attempts = useRef(0)
   const load = useCallback(async (signal?: AbortSignal) => { setError(null); setCandles([]); setTicker(null); setActiveSource(null); setStatus('loading'); try { const [nextCandles, nextTicker] = await Promise.all([fetchKlines(symbol, interval, signal, settings.source), fetchTicker(symbol, signal, settings.source)]); setCandles(nextCandles); setTicker(nextTicker); setActiveSource(sourceOf(nextTicker)); setStatus('reconnecting') } catch (e) { if (!signal?.aborted) { setError(e instanceof Error ? e.message : '无法加载公开行情'); setStatus('error') } } }, [symbol, interval, settings.source])
   useEffect(() => { const controller = new AbortController(); void load(controller.signal); return () => controller.abort() }, [load])
@@ -35,6 +37,28 @@ export default function App() {
     }
     connect();return()=>{active=false;if(reconnect.current)clearTimeout(reconnect.current);if(heartbeat)clearInterval(heartbeat);tickerWs?.close();klineWs?.close()}
   }, [symbol,interval,activeSource])
+  // Independent real spot trade feed. CVD is signed taker volume within a bounded 15-minute window.
+  useEffect(() => {
+    setOrderflow(null)
+    if (!activeSource) return
+    const accumulator = new RollingOrderflow()
+    let active = true, ws: WebSocket | null = null
+    let reconnectTrade: ReturnType<typeof setTimeout> | null = null
+    const connect = () => {
+      if (!active) return
+      ws = openPublicTradeSocket(symbol, activeSource, trade => { accumulator.add(trade) }, () => setOrderflow(null))
+      ws.addEventListener('close', () => {
+        if (!active || reconnectTrade) return
+        reconnectTrade = window.setTimeout(() => { reconnectTrade = null; connect() }, 5000)
+      })
+    }
+    connect()
+    const update = window.setInterval(() => {
+      const snapshot = accumulator.snapshot()
+      setOrderflow(snapshot.count > 0 ? snapshot : null)
+    }, 1500)
+    return () => { active = false; window.clearInterval(update); if (reconnectTrade) clearTimeout(reconnectTrade); ws?.close() }
+  }, [symbol, activeSource])
   const changeSettings = (next: AppSettings) => { setSettings(next); localStorage.setItem(settingsKey, JSON.stringify(next)) }
   const analysis = useMemo(() => ({ rsi: rsi(candles).at(-1)?.value, macd: macd(candles).macd.at(-1)?.value }), [candles])
   const up = (ticker?.changePercent ?? 0) >= 0
@@ -44,7 +68,7 @@ export default function App() {
   <div className="terminal"><aside className="symbols"><div className="section-label">交易品种 <span>USDT</span></div>{(Object.keys(symbols) as SymbolId[]).map(id => <button key={id} onClick={() => setSymbol(id)} className={`symbol ${symbol === id ? 'selected' : ''}`}><b>{symbols[id].label}</b><small>{symbols[id].name}</small>{id === symbol && ticker && <em className={ticker.changePercent >= 0 ? 'positive' : 'negative'}>{ticker.changePercent >= 0 ? '+' : ''}{ticker.changePercent.toFixed(2)}%</em>}</button>)}<div className="source-note">数据来源<br/><b>{ticker?.source ?? '连接中'}</b><br/>现货 · 公开 REST / WebSocket</div></aside>
   <main className="market"><section className="quote"><div><span className="pair">{symbols[symbol].label}</span><span className="exchange">{ticker?.source ? `${ticker.source} · SPOT` : '数据源连接中'}</span><h1 className={up ? 'positive' : 'negative'}>{ticker ? formatPrice(ticker.price) : '—'} <small>USDT</small></h1><p className={up ? 'positive' : 'negative'}>{ticker ? `${up ? '+' : ''}${ticker.changePercent.toFixed(2)}%` : '等待真实数据'}</p></div><div className="quote-stats"><Stat label="24h 最高" value={ticker ? formatPrice(ticker.high) : '—'} /><Stat label="24h 最低" value={ticker ? formatPrice(ticker.low) : '—'} /><Stat label="24h 成交量" value={ticker ? (settings.compactNumbers ? formatCompact(ticker.volume) : ticker.volume.toFixed(4)) : '—'} /><Stat label="24h 成交额" value={ticker ? `${settings.compactNumbers ? formatCompact(ticker.quoteVolume) : ticker.quoteVolume.toFixed(2)} USDT` : '—'} /></div></section>
   <section className="chart-panel"><div className="periods">{intervals.map(x => <button onClick={() => setInterval(x.id)} className={interval === x.id ? 'active' : ''} key={x.id}>{x.label}</button>)}<span className="chart-legend"><i className="ma7"/>MA7 <i className="ma25"/>MA25 <i className="ma99"/>MA99</span></div>{error ? <div className="data-error"><b>无法获取真实行情</b><p>{error}</p><button onClick={() => void load()}>重新加载</button></div> : candles.length ? <PriceChart candles={candles} chartKey={`${symbol}-${interval}`} /> : <div className="loading">正在请求公开交易所 K 线…</div>}</section>
-  <section className="indicator-strip"><Indicator label="RSI (14)" value={analysis.rsi?.toFixed(2) ?? '—'} /><Indicator label="MACD (12, 26, 9)" value={analysis.macd?.toFixed(4) ?? '—'} /><Indicator label="布林带" value="20 / 2" /><Indicator label="成交量" value={candles.at(-1) ? formatCompact(candles.at(-1)!.volume) : '—'} /></section></main>
+  <section className="indicator-strip"><Indicator label="RSI (14)" value={analysis.rsi?.toFixed(2) ?? '—'} /><Indicator label="MACD (12, 26, 9)" value={analysis.macd?.toFixed(4) ?? '—'} /><Indicator label="布林带" value="20 / 2" /><Indicator label="成交量" value={candles.at(-1) ? formatCompact(candles.at(-1)!.volume) : '—'} /><Indicator label="CVD 15m · 现货主动买卖量差" value={orderflow ? formatCompact(orderflow.cvd) : '—'} /><Indicator label="逐笔成交 VWAP 15m" value={orderflow?.vwap ? formatPrice(orderflow.vwap) : '—'} /></section></main>
   <aside className="research"><div className="panel-title">研究面板 <span>规则证据</span></div>{['趋势分析', '资金分析', '波动分析', '风险分析', '策略分析', '综合决策'].map((x, i) => <button className="research-item" onClick={()=>setPage('六 AI 研究')} key={x}><div className="research-icon">0{i + 1}</div><div><b>{x}</b><p>打开研究中心查看可审计数据</p></div><span>›</span></button>)}<div className="research-disclaimer">结论仅在已载入真实行情和规则证据充分时展示。</div><AlertPanel symbol={symbol} ticker={ticker}/></aside></div>
   <footer><span>技术指标：MA / EMA / RSI / MACD / Bollinger / Volume</span><span>行情更新时间：{formatTime(ticker?.updatedAt)}</span><span className={status === 'connected' ? 'positive' : 'negative'}>{status === 'connected' ? '● 数据流正常' : '● 数据非实时'}</span></footer></div>
 }
