@@ -99,3 +99,11 @@ footer{background:#0a1914;border-top:1px solid #244437;color:#82a99a;min-height:
  .backtest-page{padding:20px 12px}.backtest-controls{gap:10px}
 }
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{transition-duration:.01ms!important;animation-duration:.01ms!important}}
+
+/* Signed orderflow values are sourced exclusively from validated spot trade prints. */
+.indicator-strip{grid-template-columns:repeat(6,minmax(0,1fr));height:auto;min-height:83px;gap:7px;padding:13px 15px}
+.indicator-strip>div{min-width:0;padding-left:9px}
+.indicator-strip span{font-size:10px;line-height:1.4}
+.indicator-strip b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+@media(max-width:1180px){.indicator-strip{grid-template-columns:repeat(3,minmax(0,1fr));row-gap:13px}}
+@media(max-width:760px){.indicator-strip{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:16px;padding:13px 11px}}
