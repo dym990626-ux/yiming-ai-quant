@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { openPublicTradeSocket, type ActiveSource } from '../lib/market'
 import type { SymbolId } from '../types'
 import type { TradePrint } from '../lib/orderflow'
@@ -14,6 +14,7 @@ export function WhaleRadarPage() {
   const [events, setEvents] = useState<RadarItem[]>([])
   const [connection, setConnection] = useState<'connecting'|'connected'|'stale'>('connecting')
   const [lastSeen, setLastSeen] = useState<number | null>(null)
+  const lastSeenRef = useRef<number | null>(null)
   const [bark, setBark] = useState('正在检查 Bark 服务端配置…')
 
   useEffect(() => {
@@ -33,13 +34,15 @@ export function WhaleRadarPage() {
     setConnection('connecting')
     setEvents([])
     setLastSeen(null)
+    lastSeenRef.current = null
     const connect = () => {
       if (!running) return
       try {
         socket = openPublicTradeSocket(symbol, source, trade => {
           if (!running) return
           setConnection('connected')
-          setLastSeen(Date.now())
+          lastSeenRef.current = Date.now()
+          setLastSeen(lastSeenRef.current)
           const id = `${source}:${trade.id}`
           if (seen.has(id)) return
           seen.add(id)
@@ -58,7 +61,7 @@ export function WhaleRadarPage() {
     }
     connect()
     const monitor = window.setInterval(() => {
-      if (lastSeen !== null && Date.now()-lastSeen > 60000) setConnection('stale')
+      if (lastSeenRef.current !== null && Date.now()-lastSeenRef.current > 60000) setConnection('stale')
     }, 10000)
     return () => { running = false; if (reconnect) clearTimeout(reconnect); clearInterval(monitor); socket?.close() }
   }, [symbol,source,minimum])
