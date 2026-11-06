@@ -11,7 +11,7 @@ const fmt = (n: number, digits = 2) => new Intl.NumberFormat('en-US', { maximumF
 export function WhaleRadarPage() {
   const [symbol, setSymbol] = useState<SymbolId>('BTCUSDT')
   const [source, setSource] = useState<ActiveSource>('okx')
-  const [minimum, setMinimum] = useState(10000)
+  const [minimum, setMinimum] = useState(0)
   const [events, setEvents] = useState<RadarItem[]>([])
   const [connection, setConnection] = useState<'connecting'|'connected'|'stale'>('connecting')
   const [lastSeen, setLastSeen] = useState<number | null>(null)
