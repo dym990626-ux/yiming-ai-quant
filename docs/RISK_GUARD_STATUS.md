@@ -6,7 +6,7 @@
 - This endpoint **never executes orders**, even when checks pass; it returns 503. It must NOT be described as a completed D1 trading engine. A browser must never embed `SIM_API_KEY`.
 - The loss query uses the **UTC trading day** and only CLOSE order realized PnL. Before enabling order execution, implement atomic close settlement, unique idempotency keys, concurrent-order tests, and real authenticated server-side sessions.
 - Mark Price: Worker fetches genuine Binance premium index or OKX public SWAP mark price. If OKX mark price is unavailable or stale it fails closed rather than substituting candle close. Simplified liquidation formula is approximate and not exchange-grade.
-- Orderflow utility `src/lib/orderflow.ts` aggregates validated public trade prints into rolling CVD/VWAP. It is **not yet subscribed** to Binance/OKX trades and is **not shown as live CVD**. Aggressor buy/sell alone does not identify institutions or retail traders.
+- Orderflow utility `src/lib/orderflow.ts` aggregates validated public trade prints into rolling CVD/VWAP. It is now subscribed to public Binance or OKX **spot trade prints** in the market page and displayed as a rolling 15-minute CVD/VWAP when valid trades arrive. If trade data is unavailable, the UI shows an unavailable value rather than simulated data. Aggressor buy/sell alone does not identify institutions or retail traders.
 - The new migration has been committed but **not applied to production**. No tables or production data were changed by the migration commit.
 
 ## Production D1 migration procedure
