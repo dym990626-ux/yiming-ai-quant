@@ -87,15 +87,17 @@ function calculateMacd(closes: number[]) {
 
 async function binanceMarketFor(symbol: string) {
   const [premium, ratioRows, rawKlines] = await Promise.all([
-    futures('/fapi/v1/premiumIndex', { symbol }) as Promise<{ markPrice: string, indexPrice: string, lastFundingRate: string, nextFundingTime: number }>,
+    futures('/fapi/v1/premiumIndex', { symbol }) as Promise<{ markPrice: string, indexPrice: string, lastFundingRate: string, nextFundingTime: number, time: number }>,
     futures('/futures/data/topLongShortAccountRatio', { symbol, period: '1h', limit: 1 }) as Promise<Array<{ longShortRatio: string, longAccount: string, shortAccount: string, timestamp: number }>>,
     futures('/fapi/v1/klines', { symbol, interval: '1h', limit: 120 }) as Promise<Array<[number, string, string, string, string, string, number]>>,
   ])
   const closes = rawKlines.map(row => Number(row[4])).filter(Number.isFinite)
   const ratio = ratioRows.at(-1)
   const fundingRate = value(premium.lastFundingRate)
+  const markPrice = value(premium.markPrice)
+  if (markPrice === null || markPrice <= 0 || !Number.isFinite(premium.time) || Date.now() - premium.time > 60000 || premium.time > Date.now() + 10000) throw new Error('Binance 标记价格缺失或过期')
   return {
-    symbol, markPrice: value(premium.markPrice), indexPrice: value(premium.indexPrice), fundingRate,
+    symbol, markPrice, markPriceTimestamp: premium.time, indexPrice: value(premium.indexPrice), fundingRate,
     fundingRatePercent: fundingRate === null ? null : fundingRate * 100, nextFundingTime: premium.nextFundingTime,
     topLongShortAccountRatio: value(ratio?.longShortRatio), topLongAccount: value(ratio?.longAccount), topShortAccount: value(ratio?.shortAccount),
     rsi14: calculateRsi(closes), macd: calculateMacd(closes), updatedAt: Date.now(), source: 'Binance USDⓈ-M Futures Public API',
