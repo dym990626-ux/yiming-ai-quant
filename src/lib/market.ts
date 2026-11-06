@@ -1,3 +1,4 @@
+import { parseBinanceTrade, parseOkxTrade, type TradePrint } from './orderflow'
 import type { Candle, IntervalId, SymbolId, Ticker } from '../types'
 export type DataSourcePreference='auto'|'binance'|'okx';export type ActiveSource='binance'|'okx'
 const REST_BASE='https://api.binance.com/api/v3',WS_BASE='wss://stream.binance.com:9443/ws',OKX_BASE='https://www.okx.com/api/v5/market'
@@ -36,3 +37,41 @@ export function openOkxTickerSocket(symbol:SymbolId,onTicker:(x:Ticker)=>void,on
 export type KlineUpdate={candle:Candle;closed:boolean}
 export function openBinanceKlineSocket(symbol:SymbolId,interval:IntervalId,onUpdate:(x:KlineUpdate)=>void,onOpen:()=>void,onClose:()=>void,onError:()=>void){const ws=new WebSocket(`${WS_BASE}/${symbol.toLowerCase()}@kline_${interval}`);ws.onopen=onOpen;ws.onerror=onError;ws.onclose=onClose;ws.onmessage=e=>{try{const k=JSON.parse(e.data).k;if(!k || !positive(k.o) || !positive(k.h) || !positive(k.l) || !positive(k.c) || !Number.isFinite(+k.t) || !Number.isFinite(+k.v) || +k.v < 0)return;onUpdate({candle:{time:Math.floor(k.t/1000),open:+k.o,high:+k.h,low:+k.l,close:+k.c,volume:+k.v,closed:Boolean(k.x)},closed:Boolean(k.x)})}catch{}};return ws}
 export function openOkxKlineSocket(symbol:SymbolId,interval:IntervalId,onUpdate:(x:KlineUpdate)=>void,onOpen:()=>void,onClose:()=>void,onError:()=>void){const channel=`candle${okxBar[interval]}`,ws=new WebSocket('wss://ws.okx.com:8443/ws/v5/public');ws.onopen=()=>{installOkxHeartbeat(ws,onOpen);ws.send(JSON.stringify({op:'subscribe',args:[{channel,instId:okxId(symbol)}]}));onOpen()};ws.onerror=onError;ws.onclose=onClose;ws.onmessage=e=>{try{const m=JSON.parse(e.data),x=m.arg?.channel===channel?m.data?.[0]:undefined;if(!x || !positive(x[1]) || !positive(x[2]) || !positive(x[3]) || !positive(x[4]) || !Number.isFinite(+x[0]) || !Number.isFinite(+x[5]) || +x[5] < 0)return;onUpdate({candle:{time:Math.floor(+x[0]/1000),open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5],closed:x[8]==='1'},closed:x[8]==='1'})}catch{}};return ws}
+
+/** Public spot trade prints only. Never infer institution/retail identity from trades. */
+export function openPublicTradeSocket(
+  symbol: SymbolId,
+  source: ActiveSource,
+  onTrade: (trade: TradePrint) => void,
+  onError: () => void,
+): WebSocket {
+  if (source === 'binance') {
+    const ws = new WebSocket(`${WS_BASE}/${symbol.toLowerCase()}@trade`)
+    ws.onmessage = event => {
+      try {
+        const trade = parseBinanceTrade(JSON.parse(event.data))
+        if (trade) onTrade(trade)
+      } catch { /* malformed payload is discarded */ }
+    }
+    ws.onerror = onError
+    return ws
+  }
+  const ws = new WebSocket('wss://ws.okx.com:8443/ws/v5/public')
+  ws.onopen = () => {
+    installOkxHeartbeat(ws, () => {})
+    ws.send(JSON.stringify({ op: 'subscribe', args: [{ channel: 'trades', instId: okxId(symbol) }] }))
+  }
+  ws.onmessage = event => {
+    try {
+      if (event.data === 'pong') return
+      const payload = JSON.parse(event.data)
+      if (payload.arg?.channel !== 'trades' || !Array.isArray(payload.data)) return
+      for (const row of payload.data) {
+        const trade = parseOkxTrade(row)
+        if (trade) onTrade(trade)
+      }
+    } catch { /* malformed payload is discarded */ }
+  }
+  ws.onerror = onError
+  return ws
+}
