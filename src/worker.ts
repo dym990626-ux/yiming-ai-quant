@@ -1,7 +1,10 @@
 type QueryResult<T> = { results: T[] }
 
 type D1Statement = {
+  bind(...params: unknown[]): D1Statement
   all<T>(): Promise<QueryResult<T>>
+  first<T>(): Promise<T | null>
+  run(): Promise<unknown>
 }
 
 type D1Database = {
@@ -18,6 +21,7 @@ type Env = {
   TELEGRAM_BOT_TOKEN?: string
   TELEGRAM_CHAT_ID?: string
   ALERT_API_KEY?: string
+  SIM_API_KEY?: string
 }
 
 type SchemaRow = { name: string }
@@ -191,6 +195,63 @@ export default {
       } catch (error) {
         console.error('alert request failed', error)
         return json({ ok: false, sent: false, error: error instanceof Error ? error.message : '预警所需行情不可用' }, 502)
+      }
+    }
+
+
+    // All simulated order writes must enter this server-side gate.
+    // Intentionally fail-closed while ledger execution and authenticated UI migration remain disabled.
+    if (url.pathname === '/api/sim/orders') {
+      if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
+      if (!env.SIM_API_KEY) return json({ error: '模拟账本接口尚未启用：缺少服务端鉴权配置' }, 503)
+      if (request.headers.get('X-Sim-Key') !== env.SIM_API_KEY) return json({ error: 'Unauthorized' }, 401)
+      const audit = async (accountId: string, reason: string, details: string) => {
+        try {
+          await env.DB.prepare('INSERT INTO risk_events(id,account_id,event_type,reason,details) VALUES (?,?,?,?,?)')
+            .bind(crypto.randomUUID(), accountId, 'ORDER_REJECTED', reason, details.slice(0, 500)).run()
+        } catch (e) { console.error('Risk audit unavailable', e); throw e }
+      }
+      try {
+        const raw = await request.json() as Record<string, unknown>
+        const accountId = typeof raw.accountId === 'string' ? raw.accountId : ''
+        const symbol = typeof raw.symbol === 'string' ? raw.symbol : ''
+        const side = raw.side
+        const qty = typeof raw.qty === 'number' ? raw.qty : NaN
+        const stop = typeof raw.stopPrice === 'number' ? raw.stopPrice : NaN
+        if (!/^[A-Za-z0-9_-]{1,64}$/.test(accountId) || !supportedSymbols.has(symbol) ||
+            !['long', 'short'].includes(String(side)) || !Number.isFinite(qty) || qty <= 0 ||
+            !Number.isFinite(stop) || stop <= 0) {
+          return json({ error: '订单字段无效；止损价为必填项' }, 400)
+        }
+        const account = await env.DB.prepare('SELECT id FROM sim_accounts WHERE id=?')
+          .bind(accountId).first<{ id: string }>()
+        if (!account) return json({ error: '模拟账户不存在；需要先完成账本初始化' }, 404)
+        const loss = await env.DB.prepare(
+          "SELECT COALESCE(SUM(realized_pnl_usdt),0) AS pnl FROM sim_orders WHERE account_id=? AND trading_day=date('now') AND action='CLOSE'"
+        ).bind(accountId).first<{ pnl: number }>()
+        // Market values are retrieved by the Worker itself, not accepted from the browser.
+        const market = await marketFor(symbol)
+        const mark = market.markPrice
+        if (mark === null || !Number.isFinite(mark) || mark <= 0)
+          return json({ error: '有效标记价不可用，拒绝下单' }, 503)
+        const exposure = Math.abs(mark - stop) * qty
+        const notional = mark * qty
+        const dailyPnl = Number(loss?.pnl ?? NaN)
+        if (!Number.isFinite(dailyPnl)) return json({ error: '当日盈亏不可核对，拒绝执行' }, 503)
+        const reason = dailyPnl <= -20 ? 'DAILY_LOSS_CIRCUIT_BREAKER' :
+          exposure > 5 ? 'RISK_EXPOSURE_OVER_5_USDT' :
+          notional > 250 ? 'NOTIONAL_OVER_250_USDT' :
+          (side === 'long' && stop >= mark) || (side === 'short' && stop <= mark) ? 'INVALID_STOP' : null
+        if (reason) {
+          await audit(accountId, reason, JSON.stringify({ symbol, side, qty, stop, mark, exposure, notional, dailyPnl }))
+          return json({ ok: false, error: '硬风控拒绝订单', reason, dailyPnl, exposure, notional }, 403)
+        }
+        // No order is written here: never claim server-enforced execution until an
+        // atomic settlement path and browser-to-server session authentication exist.
+        return json({ ok: false, error: '风险检查通过，但服务端模拟成交引擎尚未启用，拒绝执行', executionEnabled: false }, 503)
+      } catch (error) {
+        console.error('Sim risk gate failed closed', error)
+        return json({ error: '账本或行情验证失败，拒绝执行' }, 503)
       }
     }
 
