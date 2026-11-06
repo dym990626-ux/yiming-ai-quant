@@ -29,6 +29,8 @@ jobs:
         run: npm ci
       - name: Build and type-check
         run: npm run build
+      - name: Test server risk thresholds
+        run: node --experimental-strip-types --test tests/risk-guard.test.mjs
       - name: Validate D1 ledger migration locally
         run: python3 scripts/verify_migrations.py
       - name: Validate Cloudflare deploy secrets
