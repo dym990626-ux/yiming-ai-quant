@@ -1,3 +1,4 @@
+import { normalizeDepth } from './lib/depth'
 import { evaluateSimRisk } from './lib/riskGuard'
 type QueryResult<T> = { results: T[] }
 
@@ -196,6 +197,43 @@ export default {
       } catch {
         return json({ ok: false, error: 'Bark 推送失败或超时（未发送密钥到客户端）' }, 502)
       }
+    }
+
+    // Public depth is a current order-book snapshot, not a future liquidation heatmap.
+    if (url.pathname === '/api/whale/depth') {
+      if (request.method !== 'GET') return json({ error: 'Method not allowed' },405)
+      let symbol: string
+      try { symbol = symbolFrom(url.searchParams.get('symbol')) }
+      catch { return json({ error:'不支持此交易对' },400) }
+      const sourcePreference = url.searchParams.get('source') || 'auto'
+      if (!['auto','okx','binance'].includes(sourcePreference)) return json({ error: '非法数据源' },400)
+      const errors: Record<string,string> = {}
+      const sources: Array<'OKX'|'Binance'> = sourcePreference==='okx'?['OKX']:
+        sourcePreference==='binance'?['Binance']:['OKX','Binance']
+      for (const source of sources) {
+        const controller = new AbortController()
+        const timeout = setTimeout(()=>controller.abort(),6500)
+        try {
+          const api = source==='OKX'
+            ? `https://www.okx.com/api/v5/market/books?instId=${symbol.replace('USDT','-USDT')}&sz=50`
+            : `https://data-api.binance.vision/api/v3/depth?symbol=${symbol}&limit=100`
+          const resp=await fetch(api,{signal:controller.signal,headers:{accept:'application/json'}})
+          if(!resp.ok) throw new Error(`HTTP ${resp.status}`)
+          const data=await resp.json() as unknown
+          const rows = source==='OKX'
+            ? (data && typeof data==='object' && (data as {code?:string}).code==='0'
+                ? (data as {data?:unknown[]}).data?.[0] : null)
+            : data
+          const snapshot=normalizeDepth(rows,source,symbol)
+          // A stale exchange timestamp is not a live order book.
+          if(snapshot.exchangeTime !== null &&
+             (Date.now()-snapshot.exchangeTime>60_000 || snapshot.exchangeTime>Date.now()+10_000))
+            throw new Error('交易所盘口时间戳已过期')
+          return json(snapshot)
+        } catch(e) { errors[source]=e instanceof Error?e.message:'数据处理失败' }
+        finally { clearTimeout(timeout) }
+      }
+      return json({error:'公开盘口深度暂不可用，未使用假数据',errors,symbol},502)
     }
 
     // A bounded REST snapshot helps mobile users when exchange WebSockets are blocked.
