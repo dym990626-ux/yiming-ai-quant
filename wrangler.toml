@@ -9,4 +9,5 @@ binding = "ASSETS"
 [[d1_databases]]
 binding = "DB"
 database_name = "yiming-quant"
+migrations_dir = "migrations"
 database_id = "a51b6caa-9a13-4c7a-9fac-f2b05809efa9"
