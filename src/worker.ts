@@ -1,3 +1,4 @@
+import { pollWhaleAlerts } from './lib/whaleAlerts'
 import { normalizeDepth } from './lib/depth'
 import { evaluateSimRisk } from './lib/riskGuard'
 type QueryResult<T> = { results: T[] }
@@ -6,7 +7,7 @@ type D1Statement = {
   bind(...params: unknown[]): D1Statement
   all<T>(): Promise<QueryResult<T>>
   first<T>(): Promise<T | null>
-  run(): Promise<unknown>
+  run(): Promise<{meta?:{changes?:number}}>
 }
 
 type D1Database = {
@@ -26,6 +27,8 @@ type Env = {
   SIM_API_KEY?: string
   BARK_DEVICE_KEY?: string
   BARK_ADMIN_KEY?: string
+  BARK_AUTO_ENABLED?: string
+  BARK_WHALE_THRESHOLD_USDT?: string
 }
 
 type SchemaRow = { name: string }
@@ -163,7 +166,7 @@ export default {
     // The Bark device key is a Worker secret and is never included in responses or HTML.
     if (url.pathname === '/api/bark/status') {
       if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405)
-      return json({ configured: Boolean(env.BARK_DEVICE_KEY), notificationEnabled: false, mode: 'manual-authenticated-test-only' })
+      return json({ configured: Boolean(env.BARK_DEVICE_KEY), notificationEnabled: env.BARK_AUTO_ENABLED === '1' && Boolean(env.BARK_DEVICE_KEY), mode: env.BARK_AUTO_ENABLED === '1' && env.BARK_DEVICE_KEY ? 'scheduled-with-d1-migration-required' : 'manual-authenticated-test-only' })
     }
 
     // Authenticated infrastructure smoke test. Not callable from the public UI.
@@ -445,5 +448,8 @@ export default {
 
     if (url.pathname.startsWith('/api/')) return json({ error: 'Not found' }, 404)
     return env.ASSETS.fetch(request)
+  },
+  async scheduled(_event: unknown, env: Env): Promise<void> {
+    await pollWhaleAlerts(env)
   },
 }
