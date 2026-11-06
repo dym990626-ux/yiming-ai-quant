@@ -4,6 +4,7 @@ import type { SymbolId } from '../types'
 import type { TradePrint } from '../lib/orderflow'
 import { openBinanceLiquidationSocket, type LiquidationPrint } from '../lib/liquidations'
 import { WhaleAnalytics } from './WhaleAnalytics'
+import { WhaleDeepMonitor } from './WhaleDeepMonitor'
 
 const symbols: SymbolId[] = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']
 type RadarItem = TradePrint & { notional: number; symbol: SymbolId }
@@ -161,6 +162,7 @@ export function WhaleRadarPage() {
       <div><span>主动卖出累计成交额</span><b className="negative">{fmt(stats.sell)} USDT</b></div>
     </div>
     <WhaleAnalytics trades={snapshot} source={snapshotSource} fetchedAt={snapshotTime}/>
+    <WhaleDeepMonitor symbol={symbol}/>
     <section className="whale-table whale-snapshot">
       <div className="whale-table-head"><span>交易所最近真实成交（REST 自动补载）</span><small>{snapshotSource ? `${snapshotSource} · ${snapshotTime ? new Date(snapshotTime).toLocaleTimeString('zh-CN') : ''}` : '正在检查可用数据源'}</small></div>
       <div className="whale-metrics whale-liquidation-metrics">
