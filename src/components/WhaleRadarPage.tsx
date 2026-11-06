@@ -10,12 +10,16 @@ const fmt = (n: number, digits = 2) => new Intl.NumberFormat('en-US', { maximumF
 
 export function WhaleRadarPage() {
   const [symbol, setSymbol] = useState<SymbolId>('BTCUSDT')
-  const [source, setSource] = useState<ActiveSource>('binance')
-  const [minimum, setMinimum] = useState(100000)
+  const [source, setSource] = useState<ActiveSource>('okx')
+  const [minimum, setMinimum] = useState(10000)
   const [events, setEvents] = useState<RadarItem[]>([])
   const [connection, setConnection] = useState<'connecting'|'connected'|'stale'>('connecting')
   const [lastSeen, setLastSeen] = useState<number | null>(null)
   const lastSeenRef = useRef<number | null>(null)
+  const [snapshot,setSnapshot]=useState<RadarItem[]>([])
+  const [snapshotSource,setSnapshotSource]=useState('')
+  const [snapshotError,setSnapshotError]=useState('')
+  const [snapshotTime,setSnapshotTime]=useState<number|null>(null)
   const [bark, setBark] = useState('正在检查 Bark 服务端配置…')
   const [liquidations, setLiquidations] = useState<LiquidationPrint[]>([])
   const [liquidationState, setLiquidationState] = useState('连接中')
@@ -28,6 +32,39 @@ export function WhaleRadarPage() {
       .catch(() => { if (!controller.signal.aborted) setBark('Bark 状态暂不可用。') })
     return () => controller.abort()
   }, [])
+
+  // Exchange REST snapshot avoids an empty radar when mobile WebSocket is unavailable.
+  // The sample is only the most recent exchange-returned trades; never claim full-market coverage.
+  useEffect(()=>{
+    const controller=new AbortController()
+    let active=true
+    setSnapshot([])
+    setSnapshotError('正在读取交易所近期真实成交…')
+    const refresh=async()=>{
+      try{
+        const response=await fetch(`/api/whale/trades?symbol=${symbol}&source=auto`, {cache:'no-store',signal:controller.signal})
+        const data=await response.json() as {trades?:RadarItem[];source?:string;fetchedAt?:number;error?:string;errors?:Record<string,string>}
+        if(!response.ok || !Array.isArray(data.trades))throw new Error(data.error||'近期成交接口不可用')
+        if(!active)return
+        setSnapshot(data.trades)
+        setSnapshotSource(data.source||'')
+        setSnapshotTime(data.fetchedAt||Date.now())
+        setSnapshotError('')
+      }catch(e){
+        if(!active)return
+        setSnapshotError(e instanceof Error?e.message:'近期成交加载失败')
+      }
+    }
+    void refresh()
+    const timer=window.setInterval(()=>void refresh(),20000)
+    return()=>{active=false;window.clearInterval(timer);controller.abort()}
+  },[symbol])
+  const filteredSnapshot=useMemo(()=>snapshot.filter(x=>x.notional>=minimum),[snapshot,minimum])
+  const recentTotals=useMemo(()=>{
+    const buy=snapshot.filter(x=>x.aggressor==='buy').reduce((sum,x)=>sum+x.notional,0)
+    const sell=snapshot.filter(x=>x.aggressor==='sell').reduce((sum,x)=>sum+x.notional,0)
+    return {buy,sell}
+  },[snapshot])
 
   useEffect(() => {
     let running = true
@@ -115,13 +152,25 @@ export function WhaleRadarPage() {
     <div className="whale-controls">
       <label>币种<select value={symbol} onChange={e=>setSymbol(e.target.value as SymbolId)}>{symbols.map(x=><option key={x} value={x}>{x.replace('USDT','/USDT')}</option>)}</select></label>
       <label>交易所<select value={source} onChange={e=>setSource(e.target.value as ActiveSource)}><option value="binance">Binance 现货</option><option value="okx">OKX 现货</option></select></label>
-      <label>单笔成交金额门槛<select value={minimum} onChange={e=>setMinimum(Number(e.target.value))}><option value={10000}>≥ 1 万 USDT</option><option value={50000}>≥ 5 万 USDT</option><option value={100000}>≥ 10 万 USDT</option><option value={500000}>≥ 50 万 USDT</option><option value={1000000}>≥ 100 万 USDT</option></select></label>
+      <label>单笔成交金额门槛<select value={minimum} onChange={e=>setMinimum(Number(e.target.value))}><option value={0}>全部近期成交</option><option value={1000}>≥ 1 千 USDT</option><option value={10000}>≥ 1 万 USDT</option><option value={50000}>≥ 5 万 USDT</option><option value={100000}>≥ 10 万 USDT</option><option value={500000}>≥ 50 万 USDT</option><option value={1000000}>≥ 100 万 USDT</option></select></label>
     </div>
     <div className="whale-metrics">
       <div><span>最近捕获笔数（最多100）</span><b>{stats.count}</b></div>
       <div><span>主动买入累计成交额</span><b className="positive">{fmt(stats.buy)} USDT</b></div>
       <div><span>主动卖出累计成交额</span><b className="negative">{fmt(stats.sell)} USDT</b></div>
     </div>
+    <section className="whale-table whale-snapshot">
+      <div className="whale-table-head"><span>交易所最近真实成交（REST 自动补载）</span><small>{snapshotSource ? `${snapshotSource} · ${snapshotTime ? new Date(snapshotTime).toLocaleTimeString('zh-CN') : ''}` : '正在检查可用数据源'}</small></div>
+      <div className="whale-metrics whale-liquidation-metrics">
+        <div><span>接口返回有效成交样本</span><b>{snapshot.length}</b></div>
+        <div><span>样本主动买入额</span><b className="positive">{fmt(recentTotals.buy)} U</b></div>
+        <div><span>样本主动卖出额</span><b className="negative">{fmt(recentTotals.sell)} U</b></div>
+      </div>
+      {snapshotError && <p className="whale-empty">状态：{snapshotError}</p>}
+      {snapshot.length>0 && filteredSnapshot.length===0 && <p className="whale-empty">已收到 {snapshot.length} 笔真实成交，但没有达到当前金额门槛。将门槛切换为“全部近期成交”即可查看。</p>}
+      {filteredSnapshot.length>0 && <div className="whale-list">{filteredSnapshot.slice(0,100).map(x=><div className="whale-event" key={`snapshot:${x.source}:${x.id}`}><span>{new Date(x.timestamp).toLocaleTimeString('zh-CN')}</span><b>{symbol.replace('USDT','/USDT')}</b><span className={x.aggressor==='buy'?'positive':'negative'}>{x.aggressor==='buy'?'主动买入':'主动卖出'}</span><span>{fmt(x.price)}</span><strong>{fmt(x.notional)} U</strong><small>{x.source}</small></div>)}</div>}
+      <p className="whale-feed-note">这是交易所返回的近期成交样本，不是过去24小时全部交易。每20秒刷新一次；若上游接口受地域限制，会显示具体失败状态。</p>
+    </section>
     <section className="whale-table">
       <div className="whale-table-head"><span>本次页面会话的大额成交流</span><small>{lastSeen ? `最后收到交易：${new Date(lastSeen).toLocaleTimeString('zh-CN')}`:'尚未收到有效逐笔交易'}</small></div>
       {events.length === 0 ? <p className="whale-empty">暂无符合门槛的真实成交。行情断流、区域限制或门槛过高时不会生成模拟数据。</p>:
