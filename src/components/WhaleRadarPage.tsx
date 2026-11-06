@@ -44,7 +44,7 @@ export function WhaleRadarPage() {
     setSnapshotError('正在读取交易所近期真实成交…')
     const refresh=async()=>{
       try{
-        const response=await fetch(`/api/whale/trades?symbol=${symbol}&source=auto`, {cache:'no-store',signal:controller.signal})
+        const response=await fetch(`/api/whale/trades?symbol=${symbol}&source=${source}`, {cache:'no-store',signal:controller.signal})
         const data=await response.json() as {trades?:RadarItem[];source?:string;fetchedAt?:number;error?:string;errors?:Record<string,string>}
         if(!response.ok || !Array.isArray(data.trades))throw new Error(data.error||'近期成交接口不可用')
         if(!active)return
@@ -60,7 +60,7 @@ export function WhaleRadarPage() {
     void refresh()
     const timer=window.setInterval(()=>void refresh(),20000)
     return()=>{active=false;window.clearInterval(timer);controller.abort()}
-  },[symbol])
+  },[symbol,source])
   const filteredSnapshot=useMemo(()=>snapshot.filter(x=>x.notional>=minimum),[snapshot,minimum])
   const recentTotals=useMemo(()=>{
     const buy=snapshot.filter(x=>x.aggressor==='buy').reduce((sum,x)=>sum+x.notional,0)
