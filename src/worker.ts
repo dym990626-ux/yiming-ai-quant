@@ -198,6 +198,59 @@ export default {
       }
     }
 
+    // A bounded REST snapshot helps mobile users when exchange WebSockets are blocked.
+    // Returns ONLY exchange-confirmed individual spot trades, never synthetic whale events.
+    if (url.pathname === '/api/whale/trades') {
+      if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405)
+      let symbol: string
+      try { symbol = symbolFrom(url.searchParams.get('symbol')) }
+      catch { return json({ error: 'Unsupported symbol' }, 400) }
+      const requestedSource = url.searchParams.get('source')
+      if (requestedSource && !['auto', 'okx', 'binance'].includes(requestedSource)) return json({ error: 'Invalid source' }, 400)
+      const parseTrade = (row: Record<string, unknown>, source: 'OKX' | 'Binance') => {
+        const price = Number(source === 'OKX' ? row.px : row.price)
+        const qty = Number(source === 'OKX' ? row.sz : row.qty)
+        const timestamp = Number(source === 'OKX' ? row.ts : row.time)
+        const id = String(source === 'OKX' ? row.tradeId : row.id)
+        const aggressor = source === 'OKX' ? row.side : row.isBuyerMaker === true ? 'sell' : 'buy'
+        if (!id || id === 'undefined' || !Number.isFinite(price) || price <= 0 ||
+            !Number.isFinite(qty) || qty <= 0 || !Number.isFinite(timestamp) || timestamp <= 0 ||
+            !['buy', 'sell'].includes(String(aggressor))) return null
+        return { id, symbol, source, timestamp, price, qty, notional: price * qty, aggressor }
+      }
+      const errors: Record<string,string> = {}
+      const fetchSource = async (source: 'OKX' | 'Binance') => {
+        const address = source === 'OKX'
+          ? `https://www.okx.com/api/v5/market/trades?instId=${symbol.replace('USDT','-USDT')}&limit=300`
+          : `https://data-api.binance.vision/api/v3/trades?symbol=${symbol}&limit=500`
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 6500)
+        try {
+          const resp = await fetch(address, { signal: controller.signal, headers: { accept: 'application/json' } })
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+          const body = await resp.json() as unknown
+          const raw = source === 'OKX'
+            ? (body && typeof body === 'object' && (body as {code?:string}).code === '0'
+              ? (body as {data?:unknown}).data : null)
+            : body
+          if (!Array.isArray(raw)) throw new Error('Invalid exchange response')
+          const trades = raw.map(x => x && typeof x === 'object' ? parseTrade(x as Record<string,unknown>, source) : null)
+            .filter((x): x is NonNullable<typeof x> => x !== null)
+            .sort((a,b) => b.timestamp - a.timestamp)
+          if (!trades.length) throw new Error('No valid trades received')
+          return { symbol, source, instrumentType: 'SPOT', fetchedAt: Date.now(), trades, errors }
+        } finally { clearTimeout(timeout) }
+      }
+      const sources: Array<'OKX'|'Binance'> =
+        requestedSource === 'binance' ? ['Binance'] :
+        requestedSource === 'okx' ? ['OKX'] : ['OKX','Binance']
+      for (const source of sources) {
+        try { return json(await fetchSource(source)) }
+        catch (e) { errors[source] = e instanceof Error ? e.message : 'Unknown market-data failure' }
+      }
+      return json({ error: '两个公开现货成交接口均不可用；未使用模拟数据', errors, symbol, fetchedAt: Date.now(), trades: [] }, 502)
+    }
+
     if (url.pathname === '/api/market-data') {
       try {
         const requested = (url.searchParams.get('symbols') || url.searchParams.get('symbol') || 'BTCUSDT').split(',').map(item => symbolFrom(item.trim()))
