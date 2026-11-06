@@ -18,12 +18,15 @@ jobs:
           python3 - <<'PY'
           import tarfile
           with tarfile.open('source.tar.gz','r:gz') as f:
+              members=[]
               for m in f:
                   from pathlib import PurePosixPath
                   p=PurePosixPath(m.name)
-                  if p.is_absolute() or '..' in p.parts or not (m.isfile() or m.isdir()) or p.parts[0] != 'src':
+                  if p.is_absolute() or '..' in p.parts or not (m.isfile() or m.isdir()):
                       raise SystemExit(f'Unsafe entry: {m.name}')
-              f.extractall('.',filter='data')
+                  if p.parts and p.parts[0] == 'src': members.append(m)
+              if not members: raise SystemExit('Archive has no src files')
+              f.extractall('.',members=members,filter='data')
           PY
           test -f src/main.tsx
           find src -type f | sort
