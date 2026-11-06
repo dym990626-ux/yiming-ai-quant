@@ -61,7 +61,7 @@ export function ShadowResearchPage(){
    }catch(e){return {id:strategy.id,name:strategy.name,result:null,error:e instanceof Error?e.message:'回测失败'}}
   })
  },[candles,split,sample,interval,feePct,slipPct])
- const totalAbsolute=research.reduce((sum,r)=>sum+Math.abs(r.result?.finalEquity-10000||0),0)
+ const totalAbsolute=research.reduce((sum,r)=>sum+Math.abs(r.result ? r.result.finalEquity-10000 : 0),0)
  const replayCandles=activeCandles
  const replayIndex=Math.min(replayCandles.length-1,Math.max(0,position||Math.min(30,replayCandles.length-1)))
  const replayHistory=useMemo(()=>replayCandles.slice(0,replayIndex+1),[replayCandles,replayIndex])
