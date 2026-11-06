@@ -203,6 +203,33 @@ export default {
     }
 
 
+    // Public capability report: never exposes database table names, credentials, or account IDs.
+    // The browser-local simulator is intentionally NOT a D1 protected trading engine.
+    if (url.pathname === '/api/sim/status') {
+      if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405)
+      let schemaReady = false
+      let databaseConnected = false
+      try {
+        const rows = await env.DB.prepare(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('sim_accounts','sim_orders','sim_positions','risk_events')"
+        ).all<SchemaRow>()
+        databaseConnected = true
+        const found = new Set(rows.results.map(row => row.name))
+        schemaReady = ['sim_accounts','sim_orders','sim_positions','risk_events'].every(name => found.has(name))
+      } catch {
+        // Fail closed. Lack of database access must not become an optimistic ready signal.
+      }
+      return json({
+        mode: 'browser-local-simulation',
+        serverExecutionEnabled: false,
+        serverRiskLimits: { dailyRealizedLossUsdt: 20, singleOrderRiskUsdt: 5, singleOrderNotionalUsdt: 250 },
+        databaseConnected,
+        ledgerSchemaReady: schemaReady,
+        statement: '浏览器本地模拟交易没有后端订单执行保护；服务端成交与账本迁移尚未启用。',
+        checkedAt: new Date().toISOString()
+      })
+    }
+
     // All simulated order writes must enter this server-side gate.
     // Intentionally fail-closed while ledger execution and authenticated UI migration remain disabled.
     if (url.pathname === '/api/sim/orders') {
