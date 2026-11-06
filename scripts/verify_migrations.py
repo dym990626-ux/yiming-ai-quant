@@ -4,14 +4,17 @@ import sqlite3
 import tempfile
 
 SCHEMA = Path("migrations/0001_sim_ledger.sql").read_text(encoding="utf-8")
-TABLES = {"sim_accounts", "sim_orders", "sim_positions", "risk_events"}
+TABLES = {"sim_accounts", "sim_orders", "sim_positions", "risk_events", "whale_alert_events"}
+WHALE_SCHEMA = Path("migrations/0002_whale_alerts.sql").read_text(encoding="utf-8")
 
 with tempfile.TemporaryDirectory() as temp:
     db = sqlite3.connect(str(Path(temp) / "ledger.sqlite"))
     db.execute("PRAGMA foreign_keys=ON")
     db.executescript(SCHEMA)
+    db.executescript(WHALE_SCHEMA)
     # Creation scripts must be non-destructive and idempotent.
     db.executescript(SCHEMA)
+    db.executescript(WHALE_SCHEMA)
     existing = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert TABLES <= existing, f"Missing D1 tables: {TABLES - existing}"
 
@@ -34,4 +37,11 @@ with tempfile.TemporaryDirectory() as temp:
         raise AssertionError("Foreign key protection missing")
     except sqlite3.IntegrityError:
         pass
-    print("OK: migration idempotency, D1-style schema, realized PnL, audit insert, foreign keys")
+    db.execute("""INSERT INTO whale_alert_events(event_key,symbol,source,trade_id,trade_time,side,price,notional_usdt)
+      VALUES(?,?,?,?,?,?,?,?)""", ("OKX:BTCUSDT:123","BTCUSDT","OKX","123",1,"buy",100,120000))
+    db.execute("""INSERT OR IGNORE INTO whale_alert_events(event_key,symbol,source,trade_id,trade_time,side,price,notional_usdt)
+      SELECT ?,?,?,?,?,?,?,? WHERE NOT EXISTS
+        (SELECT 1 FROM whale_alert_events WHERE symbol=? AND created_at > datetime('now','-15 minutes'))""",
+        ("OKX:BTCUSDT:124","BTCUSDT","OKX","124",2,"buy",100,120000,"BTCUSDT"))
+    assert db.execute("SELECT count(*) FROM whale_alert_events").fetchone()[0] == 1, "Whale cooldown broken"
+    print("OK: migrations 0001/0002 idempotent, ledger PnL, audit, whale alert cooldown and foreign keys")
