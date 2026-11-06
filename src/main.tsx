@@ -9,3 +9,5 @@ createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictM
 import './whale-analytics.css'
 
 import './whale-depth.css'
+
+import './shadow-research.css'
