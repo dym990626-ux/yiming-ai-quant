@@ -1,3 +1,4 @@
+import { evaluateSimRisk } from './lib/riskGuard'
 type QueryResult<T> = { results: T[] }
 
 type D1Statement = {
@@ -237,17 +238,16 @@ export default {
         const mark = market.markPrice
         if (mark === null || !Number.isFinite(mark) || mark <= 0)
           return json({ error: '有效标记价不可用，拒绝下单' }, 503)
-        const exposure = Math.abs(mark - stop) * qty
-        const notional = mark * qty
         const dailyPnl = Number(loss?.pnl ?? NaN)
         if (!Number.isFinite(dailyPnl)) return json({ error: '当日盈亏不可核对，拒绝执行' }, 503)
-        const reason = dailyPnl <= -20 ? 'DAILY_LOSS_CIRCUIT_BREAKER' :
-          exposure > 5 ? 'RISK_EXPOSURE_OVER_5_USDT' :
-          notional > 250 ? 'NOTIONAL_OVER_250_USDT' :
-          (side === 'long' && stop >= mark) || (side === 'short' && stop <= mark) ? 'INVALID_STOP' : null
-        if (reason) {
-          await audit(accountId, reason, JSON.stringify({ symbol, side, qty, stop, mark, exposure, notional, dailyPnl }))
-          return json({ ok: false, error: '硬风控拒绝订单', reason, dailyPnl, exposure, notional }, 403)
+        const check = evaluateSimRisk({
+          dailyRealizedPnl: dailyPnl, markPrice: mark, stopPrice: stop,
+          quantity: qty, side: side as 'long' | 'short'
+        })
+        if (!check.allowed) {
+          await audit(accountId, check.reason ?? 'INVALID_RISK_INPUT',
+            JSON.stringify({ symbol, side, qty, stop, mark, ...check }))
+          return json({ ok: false, error: '硬风控拒绝订单', ...check }, 403)
         }
         // No order is written here: never claim server-enforced execution until an
         // atomic settlement path and browser-to-server session authentication exist.
