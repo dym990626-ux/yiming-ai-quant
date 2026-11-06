@@ -101,21 +101,25 @@ async function binanceMarketFor(symbol: string) {
 async function okxMarketFor(symbol: string) {
   const base = symbol.replace('USDT', '')
   const instId = `${base}-USDT-SWAP`
-  const [fundingRows, candleRows] = await Promise.all([
+  const [fundingRows, candleRows, markRows] = await Promise.all([
     okx('/api/v5/public/funding-rate', { instId }) as Promise<Array<{ fundingRate: string, nextFundingTime: string }>>,
     okx('/api/v5/market/candles', { instId, bar: '1H', limit: 120 }) as Promise<Array<[string, string, string, string, string, string, string, string, string]>>,
+    okx('/api/v5/public/mark-price', { instType: 'SWAP', instId }) as Promise<Array<{ markPx: string, ts: string }>>,
   ])
   const funding = fundingRows[0]
   const closes = candleRows.slice().reverse().map(row => Number(row[4])).filter(Number.isFinite)
   if (!funding || !closes.length) throw new Error('OKX 返回的合约行情不完整')
   const fundingRate = value(funding.fundingRate)
-  const last = closes.at(-1) ?? null
+  const markRow = markRows[0]
+  const markPrice = value(markRow?.markPx)
+  const markTimestamp = Number(markRow?.ts)
+  if (markPrice === null || markPrice <= 0 || !Number.isFinite(markTimestamp) || Date.now() - markTimestamp > 60000 || markTimestamp > Date.now() + 10000) throw new Error('OKX 标记价格缺失或过期：拒绝使用成交价或收盘价替代')
   return {
-    symbol, markPrice: last, indexPrice: last, fundingRate,
+    symbol, markPrice, markPriceTimestamp: markTimestamp, indexPrice: null, fundingRate,
     fundingRatePercent: fundingRate === null ? null : fundingRate * 100, nextFundingTime: Number(funding.nextFundingTime) || null,
     topLongShortAccountRatio: null, topLongAccount: null, topShortAccount: null,
     rsi14: calculateRsi(closes), macd: calculateMacd(closes), updatedAt: Date.now(),
-    source: 'OKX 永续合约公开 API（大户账户比未提供同口径数据）',
+    source: 'OKX SWAP Mark Price + 公共行情（指数价格及大户账户比未提供同口径数据）',
   }
 }
 
