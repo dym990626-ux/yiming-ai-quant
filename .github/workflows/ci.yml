@@ -19,3 +19,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      - name: Validate risk rules
+        run: node --experimental-strip-types --test tests/risk-guard.test.mjs
+      - name: Validate ledger migration without production writes
+        run: python3 scripts/verify_migrations.py
