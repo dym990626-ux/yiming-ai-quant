@@ -432,6 +432,53 @@ export default {
       }
     }
 
+    // Read-only public project status; never executes AI agents or writes repository code.
+    // Data is sourced from GitHub Actions and issues, not generated agent activity.
+    if (url.pathname === '/api/agent-ops/status') {
+      if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405)
+      const base = 'https://api.github.com/repos/dym990626-ux/yiming-ai-quant'
+      const get = async (path: string): Promise<unknown> => {
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 6500)
+        try {
+          const response = await fetch(base + path, {
+            signal: controller.signal,
+            headers: { accept: 'application/vnd.github+json', 'user-agent': 'YimingQuant-ProjectMonitor' }
+          })
+          if (!response.ok) throw new Error('GitHub HTTP ' + response.status)
+          return response.json()
+        } finally { clearTimeout(timeout) }
+      }
+      const [runs, issues, commit] = await Promise.allSettled([
+        get('/actions/runs?per_page=12'),
+        get('/issues?state=all&per_page=40'),
+        get('/commits/main')
+      ])
+      if (runs.status === 'rejected' && issues.status === 'rejected' && commit.status === 'rejected')
+        return json({ error: 'GitHub 公共状态目前无法读取', updatedAt: new Date().toISOString(), source: 'GitHub REST API' }, 502)
+      const runData = runs.status === 'fulfilled' ? runs.value as { workflow_runs?: Array<Record<string, unknown>> } : {}
+      const issueData = issues.status === 'fulfilled' && Array.isArray(issues.value) ? issues.value as Array<Record<string, unknown>> : []
+      const commitData = commit.status === 'fulfilled' ? commit.value as {sha?:string;commit?:{message?:string}} : {}
+      return json({
+        source: 'GitHub 公共只读 API',
+        executionEnabled: false,
+        warning: '这是 GitHub 任务与工作流监控，不代表多个 AI 智能体正在自动执行。',
+        updatedAt: new Date().toISOString(),
+        commit: {sha: commitData.sha ?? null, message: commitData.commit?.message ?? null},
+        runs: (runData.workflow_runs ?? []).slice(0, 12).map(x => ({
+          id: x.id, name: x.name, status: x.status, conclusion: x.conclusion,
+          created_at: x.created_at, updated_at: x.updated_at, html_url: x.html_url,
+          head_sha: x.head_sha
+        })),
+        issues: issueData.filter(x => !x.pull_request).slice(0, 40).map(x => ({
+          number: x.number, title: x.title, state: x.state, html_url: x.html_url,
+          updated_at: x.updated_at,
+          labels: Array.isArray(x.labels) ? x.labels.map(l => (l as {name?:string}).name ?? '') : []
+        })),
+        availability: {runs: runs.status === 'fulfilled', issues: issues.status === 'fulfilled', commit: commit.status === 'fulfilled'}
+      })
+    }
+
     if (url.pathname === '/api/health') {
       if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405)
 
