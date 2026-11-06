@@ -1,3 +1,5 @@
+import { verifyExchangeAccess } from './lib/exchangeAccess'
+import { readPrivateExchange } from './lib/exchangeReadOnly'
 import { pollWhaleAlerts } from './lib/whaleAlerts'
 import { normalizeDepth } from './lib/depth'
 import { evaluateSimRisk } from './lib/riskGuard'
@@ -29,6 +31,13 @@ type Env = {
   BARK_ADMIN_KEY?: string
   BARK_AUTO_ENABLED?: string
   BARK_WHALE_THRESHOLD_USDT?: string
+  ACCESS_TEAM_DOMAIN?: string
+  ACCESS_APP_AUD?: string
+  BINANCE_RO_API_KEY?: string
+  BINANCE_RO_API_SECRET?: string
+  OKX_RO_API_KEY?: string
+  OKX_RO_API_SECRET?: string
+  OKX_RO_PASSPHRASE?: string
 }
 
 type SchemaRow = { name: string }
@@ -430,6 +439,48 @@ export default {
         console.error('Sim risk gate failed closed', error)
         return json({ error: '账本或行情验证失败，拒绝执行' }, 503)
       }
+    }
+
+    // Confidential account gateway: Cloudflare Access RS256 JWT required before ANY
+    // private exchange fetch, even status; static page is not an authorization boundary.
+    if (url.pathname.startsWith('/api/exchange/')) {
+      if(request.method!=='GET')return json({error:'Read-only method required',tradingEnabled:false},405)
+      const auth=await verifyExchangeAccess(request,env)
+      if(!auth.ok)return json({
+        error: auth.reason==='not_configured'?'ACCESS_NOT_CONFIGURED':'ACCESS_DENIED',
+        message:'账户只读网关需要有效 Cloudflare Access 登录；未开放任何交易操作。',
+        tradingEnabled:false
+      },auth.reason==='not_configured'?503:403)
+      if(url.pathname==='/api/exchange/status'){
+        return json({
+          mode:'read-only',
+          tradingEnabled:false,withdrawalsEnabled:false,
+          configured: {
+            binance:Boolean(env.BINANCE_RO_API_KEY&&env.BINANCE_RO_API_SECRET),
+            okx:Boolean(env.OKX_RO_API_KEY&&env.OKX_RO_API_SECRET&&env.OKX_RO_PASSPHRASE)
+          },
+          checkedAt:new Date().toISOString(),
+          supported:['balances','positions','orders'],
+          disclaimer:'密钥保存在 Worker Secrets，不返回到浏览器。API Key 仍须在交易所侧关闭交易和提币权限。'
+        })
+      }
+      if(url.pathname==='/api/exchange/read'){
+        const exchange=url.searchParams.get('exchange')
+        const view=url.searchParams.get('view')
+        if(exchange!=='binance'&&exchange!=='okx')return json({error:'INVALID_EXCHANGE'},400)
+        if(view!=='balances'&&view!=='positions'&&view!=='orders')return json({error:'INVALID_VIEW'},400)
+        try{
+          const data=await readPrivateExchange(exchange,view,env)
+          return json({...data,tradingEnabled:false})
+        }catch(error){
+          const detail=error instanceof Error?error.message:'UNKNOWN_ERROR'
+          const missing=detail.endsWith('_SECRETS_MISSING')
+          const message=missing?'交易所只读密钥尚未配置':'交易所数据暂不可用；检查只读 API 权限、IP 白名单、网络限制或时间同步。'
+          console.error('Exchange read-only request failed',{exchange,view,category:missing?'unconfigured':'upstream_failed'})
+          return json({error:missing?'EXCHANGE_NOT_CONFIGURED':'EXCHANGE_UPSTREAM_UNAVAILABLE',message,tradingEnabled:false},missing?503:502)
+        }
+      }
+      return json({error:'Not found'},404)
     }
 
     // Read-only public project status; never executes AI agents or writes repository code.
