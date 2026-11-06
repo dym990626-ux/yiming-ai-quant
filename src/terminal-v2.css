@@ -136,3 +136,8 @@ footer{background:#0a1914;border-top:1px solid #244437;color:#82a99a;min-height:
 .whale-bark{background:#17261c;border:1px solid #476144;border-radius:10px;padding:16px;margin-top:16px}
 .whale-bark b{font-size:13px;color:#d9f7e6}.whale-bark p{color:#c2d8bd;font-size:12px;line-height:1.6}.whale-bark small{color:#8eb4a2;line-height:1.5}
 @media(max-width:760px){.whale-page{padding:16px 10px 34px}.whale-heading{display:block}.whale-heading h1{font-size:22px}.whale-status{display:inline-block;margin-top:12px}.whale-controls{grid-template-columns:1fr;gap:9px}.whale-metrics{grid-template-columns:1fr;gap:8px}.whale-metrics b{font-size:17px}.whale-table-head{display:block}.whale-table-head small{display:block;margin-top:6px}.whale-list{overflow-x:auto}.whale-event{min-width:650px;padding:12px;font-size:11px}}
+
+.whale-liquidation-metrics{margin:12px;padding:0}
+.whale-liquidation-metrics>div{background:#142d23}
+.whale-liquidation-metrics b{font-size:16px}
+.whale-feed-note{padding:12px 16px;color:#a6bdac;font-size:11px;line-height:1.7;border-top:1px solid #29503f;margin:0}
