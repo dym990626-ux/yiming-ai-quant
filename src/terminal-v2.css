@@ -107,3 +107,6 @@ footer{background:#0a1914;border-top:1px solid #244437;color:#82a99a;min-height:
 .indicator-strip b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
 @media(max-width:1180px){.indicator-strip{grid-template-columns:repeat(3,minmax(0,1fr));row-gap:13px}}
 @media(max-width:760px){.indicator-strip{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:16px;padding:13px 11px}}
+
+/* Explicit account protection status remains readable on phones. */
+.sim-risk-status{margin:12px 0 0!important;padding:10px 13px;border:1px solid #82602b;border-radius:7px;background:#30240f;color:#ffdb91!important;font-size:12px!important;line-height:1.6;max-width:760px}
