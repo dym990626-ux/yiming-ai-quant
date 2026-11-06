@@ -1,0 +1,30 @@
+/* Private read-only exchange account workspace: dense responsive institutional UI */
+.exchange-account-page{padding:20px clamp(10px,2.3vw,30px) 50px;min-height:100dvh;background:radial-gradient(ellipse at 80% 0,#17392e66,transparent 47%),#081811;color:#e5f6eb}
+.exa-head,.exa-table-heading{display:flex;justify-content:space-between;align-items:center;gap:15px}
+.exa-head h1{font-size:clamp(22px,3vw,31px);margin:6px 0}.exa-head p{color:#a0bdae;font-size:12px;line-height:1.65;margin:0}
+.exa-lock{border:1px solid #457657;background:#173524;padding:13px 16px;border-radius:8px;display:grid;gap:4px;min-width:180px}
+.exa-lock strong{color:#76e6b6;letter-spacing:.1em;font-size:14px}.exa-lock span{font-size:10px;color:#abd1b9}
+.exa-state{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:17px 0}
+.exa-state>div{background:#11291e;border:1px solid #2c5842;border-radius:8px;padding:14px;display:grid;gap:8px;min-width:0}
+.exa-state span{font-size:11px;color:#8cad9b}.exa-state b{font-size:14px;overflow-wrap:anywhere}
+.exa-controls{display:flex;gap:10px;align-items:end;margin:15px 0;flex-wrap:wrap}
+.exa-controls label{display:grid;gap:5px;color:#9bbcaa;font-size:11px;flex:1;min-width:150px}
+.exa-controls select,.exa-controls button{background:#173b2b;color:#ecfff1;border:1px solid #3b7755;border-radius:7px;padding:11px 12px}
+.exa-controls button{cursor:pointer}.exa-controls button:disabled{opacity:.5}
+.exa-table,.exa-instructions{background:#0e271b;border:1px solid #2c513e;border-radius:9px;padding:15px;margin-bottom:12px}
+.exa-table-heading{border-bottom:1px solid #2e5741;padding-bottom:12px}
+.exa-table-heading>div{display:grid;gap:5px}.exa-table-heading strong{font-size:15px}
+.exa-table-heading small,.exa-table-heading>span{font-size:10px;color:#8baf99}
+.exa-empty{font-size:12px;color:#91b49e;padding:23px 9px}
+.exa-error{border:1px solid #6c5543;color:#ffcaad;background:#372820;border-radius:7px;font-size:11px;line-height:1.6;padding:12px;margin:13px 0}
+.exa-scroll{max-width:100%;overflow:auto}
+.exa-scroll table{width:100%;border-collapse:collapse;min-width:570px;margin:10px 0;font-variant-numeric:tabular-nums;font-size:11px;text-align:right}
+.exa-scroll th,.exa-scroll td{padding:11px 8px;border-bottom:1px solid #2a4a37;white-space:nowrap}
+.exa-scroll th{color:#9cbaa9;font-weight:500}.exa-scroll td{color:#e2f6e9}
+.exa-scroll th:first-child,.exa-scroll td:first-child{text-align:left}
+.exa-source{font-size:10px;color:#95b29f;line-height:1.6;margin:8px 0 0}
+.exa-instructions h2{font-size:15px;margin:3px 0 14px}
+.exa-instructions p{font-size:11px;color:#a3bbaa;line-height:1.8;overflow-wrap:anywhere}
+.exa-instructions code{color:#85deb7;background:#193a29;padding:2px 4px;border-radius:3px}
+@media(max-width:820px){.exa-state{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.exa-head{display:block}.exa-lock{margin-top:14px}.exa-state>div{padding:11px}.exa-state b{font-size:12px}.exa-controls label{min-width:120px}.exa-table{padding:10px}}
