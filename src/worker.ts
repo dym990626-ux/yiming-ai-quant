@@ -23,6 +23,8 @@ type Env = {
   TELEGRAM_CHAT_ID?: string
   ALERT_API_KEY?: string
   SIM_API_KEY?: string
+  BARK_DEVICE_KEY?: string
+  BARK_ADMIN_KEY?: string
 }
 
 type SchemaRow = { name: string }
@@ -156,6 +158,45 @@ function scoreFor(market: Awaited<ReturnType<typeof marketFor>>) {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
+
+    // The Bark device key is a Worker secret and is never included in responses or HTML.
+    if (url.pathname === '/api/bark/status') {
+      if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405)
+      return json({ configured: Boolean(env.BARK_DEVICE_KEY), notificationEnabled: false, mode: 'manual-authenticated-test-only' })
+    }
+
+    // Authenticated infrastructure smoke test. Not callable from the public UI.
+    if (url.pathname === '/api/bark/test') {
+      if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
+      if (!env.BARK_DEVICE_KEY || !env.BARK_ADMIN_KEY) return json({ error: 'Bark 安全密钥未配置' }, 503)
+      if (request.headers.get('X-Bark-Admin-Key') !== env.BARK_ADMIN_KEY) return json({ error: 'Unauthorized' }, 401)
+      try {
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 7000)
+        let response: Response
+        try {
+          response = await fetch('https://api.day.app/push', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json; charset=utf-8' },
+            body: JSON.stringify({
+              device_key: env.BARK_DEVICE_KEY,
+              title: '一鸣 AI Quant · Bark 测试',
+              body: '服务端推送通道测试，非交易信号。',
+              group: 'Yiming AI Quant',
+            }),
+            signal: controller.signal,
+          })
+        } finally {
+          clearTimeout(timeout)
+        }
+        if (!response.ok) return json({ ok: false, error: 'Bark 推送网关拒绝请求', status: response.status }, 502)
+        const data = await response.json() as { code?: number; message?: string }
+        if (data.code !== 200) return json({ ok: false, error: 'Bark 网关未确认发送', status: data.code ?? null }, 502)
+        return json({ ok: true, acceptedByBark: true, deliveredToDevice: 'not_verified' })
+      } catch {
+        return json({ ok: false, error: 'Bark 推送失败或超时（未发送密钥到客户端）' }, 502)
+      }
+    }
 
     if (url.pathname === '/api/market-data') {
       try {
