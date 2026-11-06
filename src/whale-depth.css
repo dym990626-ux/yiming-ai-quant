@@ -1,0 +1,31 @@
+/* Whale market-depth and evidence center: mobile-first dense cards */
+.wd-root{margin:12px 0 18px;color:#e5f5ee}
+.wd-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:10px 0 12px}
+.wd-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:14px}
+.wd-metrics>div{border:1px solid #2b5540;background:#132e23;border-radius:8px;padding:12px}
+.wd-metrics span{display:block;font-size:10px;color:#9bbbaa;margin-bottom:6px}
+.wd-metrics b{display:block;overflow-wrap:anywhere;font-size:15px;font-variant-numeric:tabular-nums}
+.wd-depth{margin-top:15px}
+.wd-depth>div,.wd-scan,.wd-archive>div{display:grid;grid-template-columns:70px 1fr auto;gap:10px;align-items:center;padding:9px 3px;border-bottom:1px solid #234335;font-size:11px;font-variant-numeric:tabular-nums}
+.wd-depth span,.wd-archive span{color:#95b7a5}
+.wd-depth b{text-align:right}
+.wd-scan{grid-template-columns:85px 75px 1fr 1fr}
+.wd-scan small{grid-column:2/-1;color:#ec987d;overflow-wrap:anywhere}
+.wd-scan span{color:#9abcae}
+.wd-scanner{margin-top:10px}
+.wd-scan b:last-child{text-align:right}
+.wd-actions{display:flex;gap:7px}
+.wd-actions button{background:#173829;border:1px solid #32634b;border-radius:6px;color:#a6e5c8;padding:7px 9px;font-size:10px;cursor:pointer}
+.wa-panel-head select{background:#143124;border:1px solid #3d7155;border-radius:6px;color:#ddf5e9;padding:7px;font-size:11px}
+.wd-archive{margin-top:10px;max-height:260px;overflow:auto}
+.wd-archive>div{grid-template-columns:95px 90px 1fr auto}
+@media(max-width:980px){.wd-grid{grid-template-columns:1fr}}
+@media(max-width:760px){
+ .wd-grid{gap:9px}
+ .wd-metrics>div{padding:10px}
+ .wd-metrics b{font-size:13px}
+ .wd-scan{grid-template-columns:65px 65px 1fr 1fr;gap:5px;font-size:10px}
+ .wd-archive>div{grid-template-columns:75px 80px 1fr auto;font-size:10px;gap:5px}
+ .wd-actions{flex-wrap:wrap;justify-content:flex-end}
+ .wd-actions button{padding:6px}
+}
