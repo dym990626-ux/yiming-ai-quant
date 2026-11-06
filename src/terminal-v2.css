@@ -1,0 +1,101 @@
+/* YIMING QUANT — V2 terminal visual system, 2026-11-06 */
+:root{--t-bg:#07120f;--t-surface:#0d1d19;--t-raised:#112720;--t-edge:#25473d;--t-strong:#edf8f3;--t-dim:#90b4a7;--t-accent:#49dbb5;--t-red:#ef6472}
+html,body,#root{background:var(--t-bg);color:var(--t-strong)}
+body{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.app{background:var(--t-bg);min-height:100dvh}
+.topbar{background:#0a1915;min-height:64px;border-bottom:1px solid var(--t-edge);box-shadow:0 6px 24px #0003;padding:0 22px;gap:22px}
+.brand{color:var(--t-strong);font-size:16px;letter-spacing:.015em;font-weight:800}
+.brand-mark{width:34px;height:34px;background:linear-gradient(135deg,#2ad9aa,#12836d);border:1px solid #79e1c1;color:#051814;border-radius:10px;box-shadow:0 0 24px #17b98b32}
+.topbar nav{gap:3px;align-items:center;overflow:auto;scrollbar-width:none}
+.topbar nav button{height:36px;padding:0 13px;white-space:nowrap;font-size:12px;color:#9bb9ac;border:1px solid transparent;border-radius:7px}
+.topbar nav button:hover{background:#17382e;color:#fff}
+.topbar nav button.active{background:#14372d;color:#68e8c3;border-color:#306a57;font-weight:700}
+.connection{color:#a3c8b8;background:#102820;padding:7px 12px;border:1px solid #285042;border-radius:30px;font-size:11px}
+.connection i{background:#e2b66b;box-shadow:0 0 0 3px #e2b66b18}
+.connection.connected i{background:#49dbb5;box-shadow:0 0 9px #49dbb5}
+.terminal{grid-template-columns:186px minmax(0,1fr) 280px;gap:10px;padding:10px;min-height:0;background:#07120f}
+.symbols,.research{background:#0e201b;border:1px solid var(--t-edge);border-radius:10px;padding:16px 10px}
+.section-label,.panel-title{font-size:11px!important;letter-spacing:.12em;text-transform:uppercase;color:#d6efe3;padding:0 9px 16px}
+.section-label span,.panel-title span{color:#6fc9ab}
+.symbol{padding:14px 11px;margin-bottom:7px;border-radius:7px;color:#d7efe5;border:1px solid transparent}
+.symbol:hover{background:#18342a}
+.symbol.selected{background:linear-gradient(90deg,#174535,#102c24);border-color:#327c61;box-shadow:inset 3px 0 0 #49dbb5}
+.symbol b{font-size:15px;letter-spacing:.025em}.symbol small{color:#81a99b;font-size:11px}
+.source-note{border-color:var(--t-edge);color:#84aa9c}.source-note b{color:#d3ebe1}
+.market{border:1px solid var(--t-edge);border-radius:10px;overflow:hidden;background:#091a15}
+.quote{background:linear-gradient(116deg,#112e23 0%,#0c201a 56%,#0b1a16 100%);border-bottom:1px solid #2b5848;min-height:148px;padding:23px 25px}
+.pair{color:#ebfff5;font-size:19px;letter-spacing:.025em}
+.exchange{background:#173d30;color:#65e5bd;border:1px solid #2a7556;font-size:10px;padding:4px 8px}
+.quote h1{font-size:40px;letter-spacing:-.025em;margin:10px 0 0;font-variant-numeric:tabular-nums}
+.quote h1 small{color:#97bba9;font-size:12px}
+.quote p{font-size:13px;font-weight:800;margin-top:4px}
+.quote-stats{gap:18px 27px}
+.quote-stats span,.indicator-strip span{color:#80a89a;font-size:10px;letter-spacing:.06em}
+.quote-stats b,.indicator-strip b{color:#e1f7ec;font-size:14px;font-variant-numeric:tabular-nums}
+.chart-panel{background:#091913;min-height:350px}
+.periods{height:52px;background:#0c211a;border-bottom:1px solid #264d3d;gap:4px;padding:0 16px}
+.periods button{color:#88ab9c;font-size:12px;padding:7px 11px;border-radius:5px}
+.periods button:hover,.periods button.active{background:#20513f;color:#69e9c3}
+.chart-legend{color:#80aa9a}
+.chart{background:#091913;min-height:325px}
+.loading,.data-error{background:#0b1e18;color:#9dbbad}
+.data-error b{color:#ff7880}
+.data-error button{background:#173f31;border:1px solid #3b8d69;color:#ecfff3}
+.indicator-strip{background:#10251d;border-top:1px solid #2a5542;height:83px}
+.indicator-strip>div{padding-left:14px;border-left:2px solid #2d6b54}
+.indicator-strip b{font-size:15px}
+.research{border:1px solid var(--t-edge)}
+.research-item{background:transparent!important;color:#e4f4ed!important;border-bottom:1px solid #274539;padding:15px 8px;transition:background .16s ease}
+.research-item:hover{background:#17372b!important}
+.research-icon{background:#1e4c39;color:#64e7bb;border:1px solid #397a5d;font-size:10px;padding:6px 8px}
+.research-item b{font-size:12px;color:#e3f5ea}
+.research-item p{color:#86a99b}
+.research-item>span{color:#57d2a9}
+.research-disclaimer{background:#332a16;border:1px solid #6c5326;color:#efd394}
+footer{background:#0a1914;border-top:1px solid #244437;color:#82a99a;min-height:36px}
+.positive{color:#43dba9!important}.negative{color:#ef6472!important}
+.alert-panel{border-color:var(--t-edge)}
+.alert-form input,.alert-form select,.alert-row input{background:#0a1916;color:#e3f4e9;border-color:#315b49}
+.alert-form button,.primary{background:#2fcda3;color:#062119}
+.alert-list>div{border-color:var(--t-edge);color:#93b2a7}.alert-list b{color:#e2f5e9}
+.alert-notice{background:#15382b;color:#6deac2}.alert-list p{color:#93b2a7}
+.placeholder,.backtest-page,.research-page,.settings-page,.leverage-page{color:#e4f4ed}
+.placeholder>p,.backtest-heading p,.research-result p,.research-summary p,.ai-module li,.backtest-note{color:#91b3a5}
+.eyebrow{color:#49dbb5}
+.empty-card,.backtest-controls,.metrics,.trade-card,.research-result,.research-summary,.ai-module,.settings-card,.research-stamp,.sim-balance{background:#10251e;border-color:#2a5141;color:#e3f5eb}
+.backtest-controls input,.backtest-controls select,.settings-card select,.sim-account input,.sim-order input{background:#081912;border-color:#37614d;color:#e9f8ef}
+.backtest-controls label,.settings-card label,.settings-card select,.sim-account label,.sim-order label{color:#a1c5b4}
+.metrics>div,.research-grid>div,.research-summary>div,.trade-card h2,.trade-row,.ai-module-head,.ai-limitation,.card-title-row,.report-list>div{border-color:#2a5141}
+.metrics span,.research-grid p,.research-result span,.research-summary span,.ai-module-head b,.research-stamp,.research-stamp small,.report-list>div,.backtest-meta{color:#88ad9c}
+.metrics b,.research-grid b,.research-stamp b,.report-list b,.ai-module h2,.research-result h2,.research-summary h2,.settings-card h2,.trade-card h2,.sim-balance b,.position-card b{color:#e5f7ed}
+.ai-module-head span{background:#1d4e3c;color:#65e8bd}
+.settings-card,.ai-module,.trade-card{box-shadow:0 12px 30px #0002}
+.subtle-button{background:#17362a;border-color:#39604f;color:#def4e9}
+.sim-price{color:#eafbef}
+.sim-balance b{color:#4fe5b8}
+.research-result,.research-summary{border-radius:10px}
+@media(max-width:1180px){.terminal{grid-template-columns:164px minmax(0,1fr)}.research{display:none}.quote h1{font-size:34px}}
+@media(max-width:760px){
+ .app{min-height:100dvh;height:auto;padding-bottom:0}
+ .topbar{height:auto;min-height:62px;display:flex;flex-wrap:wrap;gap:0;padding:11px 12px 0;overflow:visible}
+ .brand{height:36px;font-size:15px;flex:1}.brand-mark{width:30px;height:30px}
+ .topbar nav{width:100%;order:3;height:52px;gap:5px;padding:6px 0;overflow-x:auto}
+ .topbar nav button{padding:0 12px;font-size:12px;flex-shrink:0}
+ .connection{display:flex;margin:0;font-size:10px;padding:5px 9px}
+ .terminal{display:flex;flex-direction:column;gap:9px;padding:9px}
+ .symbols{display:flex;flex-direction:row;overflow-x:auto;gap:8px;padding:9px;border:1px solid var(--t-edge);scrollbar-width:none}
+ .symbol{min-width:136px;flex:1;padding:9px 11px;margin:0;min-height:59px}
+ .symbol b{font-size:13px}.symbol small{font-size:10px}
+ .market{border-radius:9px}
+ .quote{padding:17px 14px;min-height:118px;gap:12px}
+ .pair{font-size:16px}.quote h1{font-size:32px;margin-top:10px}
+ .quote-stats{display:none}
+ .chart-panel{min-height:455px}.periods{height:47px;overflow-x:auto;scrollbar-width:none;padding:0 8px}
+ .periods button{min-width:38px;padding:7px 10px}
+ .chart{min-height:400px}
+ .indicator-strip{grid-template-columns:repeat(2,minmax(0,1fr));height:auto;padding:14px 12px;gap:12px}
+ .indicator-strip>div{padding-left:9px}.indicator-strip b{font-size:14px}
+ footer{padding:10px 12px;gap:7px;line-height:1.4;font-size:10px}
+ .backtest-page{padding:20px 12px}.backtest-controls{gap:10px}
+}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{transition-duration:.01ms!important;animation-duration:.01ms!important}}
