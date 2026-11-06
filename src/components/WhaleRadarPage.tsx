@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { openPublicTradeSocket, type ActiveSource } from '../lib/market'
 import type { SymbolId } from '../types'
 import type { TradePrint } from '../lib/orderflow'
+import { openBinanceLiquidationSocket, type LiquidationPrint } from '../lib/liquidations'
 
 const symbols: SymbolId[] = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']
 type RadarItem = TradePrint & { notional: number; symbol: SymbolId }
@@ -16,6 +17,8 @@ export function WhaleRadarPage() {
   const [lastSeen, setLastSeen] = useState<number | null>(null)
   const lastSeenRef = useRef<number | null>(null)
   const [bark, setBark] = useState('正在检查 Bark 服务端配置…')
+  const [liquidations, setLiquidations] = useState<LiquidationPrint[]>([])
+  const [liquidationState, setLiquidationState] = useState('连接中')
 
   useEffect(() => {
     const controller = new AbortController()
@@ -66,6 +69,39 @@ export function WhaleRadarPage() {
     return () => { running = false; if (reconnect) clearTimeout(reconnect); clearInterval(monitor); socket?.close() }
   }, [symbol,source,minimum])
 
+  useEffect(() => {
+    let active=true, ws:WebSocket|null=null
+    let retry:ReturnType<typeof setTimeout>|null=null
+    const ids=new Set<string>()
+    setLiquidations([]);setLiquidationState('连接中')
+    const connect=()=>{
+      if(!active)return
+      try {
+        ws=openBinanceLiquidationSocket(symbol,item=>{
+          if(!active || ids.has(item.id))return
+          ids.add(item.id)
+          if(ids.size>1000)ids.clear()
+          setLiquidations(prev=>[item,...prev].slice(0,100))
+          setLiquidationState('已接收真实强平广播')
+        })
+        ws.addEventListener('open',()=>setLiquidationState('已连接 · 等待强平广播'))
+        ws.addEventListener('error',()=>setLiquidationState('数据暂不可用'))
+        ws.addEventListener('close',()=>{
+          if(!active)return
+          setLiquidationState('断流重连中')
+          retry=window.setTimeout(connect,5000)
+        })
+      }catch { setLiquidationState('数据暂不可用') }
+    }
+    connect()
+    return ()=>{active=false;if(retry)clearTimeout(retry);ws?.close()}
+  },[symbol])
+  const liquidationSummary=useMemo(()=>{
+    const buy=liquidations.filter(x=>x.side==='BUY').reduce((sum,x)=>sum+x.notional,0)
+    const sell=liquidations.filter(x=>x.side==='SELL').reduce((sum,x)=>sum+x.notional,0)
+    return {buy,sell}
+  },[liquidations])
+
   const stats = useMemo(() => {
     const buy = events.filter(x=>x.aggressor === 'buy').reduce((v,x)=>v+x.notional,0)
     const sell = events.filter(x=>x.aggressor === 'sell').reduce((v,x)=>v+x.notional,0)
@@ -91,6 +127,24 @@ export function WhaleRadarPage() {
       {events.length === 0 ? <p className="whale-empty">暂无符合门槛的真实成交。行情断流、区域限制或门槛过高时不会生成模拟数据。</p>:
       <div className="whale-list">{events.map(x=><div className="whale-event" key={`${x.source}:${x.symbol}:${x.id}`}><span>{new Date(x.timestamp).toLocaleTimeString('zh-CN')}</span><b>{x.symbol.replace('USDT','/USDT')}</b><span className={x.aggressor==='buy'?'positive':'negative'}>{x.aggressor==='buy'?'主动买入':'主动卖出'}</span><span>{fmt(x.price)}</span><strong>{fmt(x.notional)} U</strong><small>{x.source}</small></div>)}</div>}
     </section>
+    <section className="whale-table">
+      <div className="whale-table-head"><span>真实强平广播 · Binance USD-M</span><small>{liquidationState}</small></div>
+      <div className="whale-metrics whale-liquidation-metrics">
+        <div><span>BUY 方向强平订单广播成交额</span><b className="positive">{fmt(liquidationSummary.buy)} USDT</b></div>
+        <div><span>SELL 方向强平订单广播成交额</span><b className="negative">{fmt(liquidationSummary.sell)} USDT</b></div>
+        <div><span>本次会话已捕获广播</span><b>{liquidations.length}</b></div>
+      </div>
+      {liquidations.length ? <div className="whale-list">
+        {liquidations.map(x=><div className="whale-event" key={x.id}>
+          <span>{new Date(x.time).toLocaleTimeString('zh-CN')}</span>
+          <b>{x.symbol.replace('USDT','/USDT')}</b>
+          <span className={x.side==='BUY'?'positive':'negative'}>{x.side==='BUY'?'BUY':'SELL'}</span>
+          <span>{fmt(x.price)}</span><strong>{fmt(x.notional)} U</strong><small>公开强平</small>
+        </div>)}
+      </div> : <p className="whale-empty">尚无强平广播。此数据源可能受区域网络限制；未收到事件不代表市场没有强平。</p>}
+      <p className="whale-feed-note">仅展示交易所公开强平订单快照，可能有广播频率限制和遗漏。不能据此复原全部清算量、预测未发生的爆仓价，也不能识别鲸鱼持仓账户；完整清算热力图需要额外可核实的持仓/杠杆分布数据。</p>
+    </section>
+    <section className="whale-bark"><b>资金流向及持仓口径说明</b><p>上方主动买卖成交额是当前页面捕获的大额现货成交差，不代表交易所真实净入金，也不能识别某个账户持仓。公开大户多空账户比和资金费率可在“杠杆风控”查看；个人鲸鱼持仓尚无可靠公开数据源。</p></section>
     <div className="whale-bark"><b>Bark 推送状态</b><p>{bark}</p><small>本页不请求或显示 Bark 设备密钥；自动推送需后端规则、鉴权和去重验收后才启用。</small></div>
   </main>
 }
